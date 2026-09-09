@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>Virtual CAM Cloud</title>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header>
+        <div>
+          <p class="eyebrow">REALTIME CHARACTER TRANSFORM</p>
+          <h1>Virtual CAM Cloud</h1>
+        </div>
+        <div class="status" id="status" data-tone="idle">
+          <span class="status-dot"></span>
+          <span id="statusText">Ready</span>
+        </div>
+      </header>
+
+      <section class="video-grid">
+        <article class="video-card input-card">
+          <div class="video-label">Camera input</div>
+          <video id="inputVideo" autoplay muted playsinline></video>
+          <div class="video-placeholder" id="inputPlaceholder">Start the camera to preview your input.</div>
+        </article>
+
+        <article class="video-card output-card" id="outputCard">
+          <div class="video-label">AI-generated video</div>
+          <video id="outputVideo" autoplay muted playsinline></video>
+          <div class="video-placeholder" id="outputPlaceholder">Your transformed stream will appear here.</div>
+          <button class="floating-button" id="fullscreenButton" type="button" disabled>Full-screen output</button>
+        </article>
+      </section>
+
+      <section class="control-panel">
+        <div class="field field-wide">
+          <label for="accessKey">Personal access key</label>
+          <input id="accessKey" type="password" autocomplete="off" spellcheck="false" placeholder="Access key supplied by the app owner" />
+          <p class="hint">Not your Decart API key. This page does not save your key or reference image in browser storage.</p>
+        </div>
+        <div class="field">
+          <label for="cameraSelect">Camera</label>
+          <div class="inline-field">
+            <select id="cameraSelect"><option value="">Default camera</option></select>
+            <button class="secondary compact" id="refreshCamerasButton" type="button">Refresh</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="modelSelect">Model</label>
+          <select id="modelSelect">
+            <option value="lucy-2.1" selected>Lucy 2.1 (best quality)</option>
+            <option value="lucy-2.5">Lucy 2.5 (smoother, lower quality)</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="referenceInput">Reference face</label>
+          <input id="referenceInput" type="file" accept="image/png,image/jpeg,image/webp" />
+          <p class="hint">Use a clear, front-facing portrait that you own or have permission to use.</p>
+        </div>
+
+        <div class="field field-wide">
+          <label for="promptInput">Transformation prompt</label>
+          <textarea id="promptInput" rows="4">Create a photorealistic professional webcam video using the identity and facial features of the attached consented reference person. Preserve the person’s face shape, skin tone, hairstyle, eyes, eyebrows, nose, facial hair, and age consistently across every frame. Follow the live speaker’s natural lip movements, blinking, expressions, and small head movements accurately. Keep the face stable with no flickering, stretching, melting, identity drift, duplicate features, warped mouth, distorted teeth, or changing hairstyle. Use realistic skin texture, soft indoor lighting, a fixed eye-level webcam angle, natural shoulders, and a clean neutral office background. Frame the person from the chest upward, centered like a normal Zoom call. Keep motion subtle and professional.</textarea>
+          <label class="check-row"><input id="enhanceInput" type="checkbox" checked /> Let Decart enhance the prompt</label>
+        </div>
+
+        <div class="field field-wide">
+          <label class="check-row"><input id="consent" type="checkbox" /> I agree to send my camera video, reference image, and prompt to Decart for AI processing, and I have permission to use this image.</label>
+          <p class="hint">Start camera previews locally without microphone capture. Connect starts cloud processing. Tell meeting participants when you use AI-generated video.</p>
+        </div>
+        <div class="actions field-wide">
+          <button class="secondary" id="cameraButton" type="button">Start camera</button>
+          <button class="primary" id="connectButton" type="button" disabled>Connect and transform</button>
+          <button class="secondary" id="updateButton" type="button" disabled>Apply reference</button>
+          <button class="danger" id="stopButton" type="button" disabled>Stop</button>
+        </div>
+      </section>
+
+      <aside class="notice" id="notice" hidden></aside>
+      <p class="hint footer-note">This website provides a video preview, not an operating-system camera. Meetings require the separately configured browser extension. No OBS or Python is needed on a visitor's laptop for the extension approach.</p>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
