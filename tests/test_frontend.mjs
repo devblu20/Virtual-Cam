@@ -42,11 +42,11 @@ function harness() {
   el("consent").checked = true;
   const raw = media();
   const remote = media();
-  const calls = { fetch: [], decart: [], disconnected: 0 };
+  const calls = { fetch: [], decart: [], updates: [], disconnected: 0 };
   const connection = {
     disconnect() { calls.disconnected++; },
     on() {},
-    async set() {},
+    async set(state) { calls.updates.push(state); },
   };
   const hooks = {
     camera: async () => raw,
@@ -99,6 +99,30 @@ test("connect sends personal auth and renders only transformed output", async ()
     assert.equal(h.raw.track.stopped, true);
     assert.equal(h.remote.track.stopped, true);
     assert.equal(h.el("outputVideo").srcObject, null);
+  } finally { h.cleanup(); }
+});
+
+test("website uses Bluqq branding without editable prompt controls", () => {
+  const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  assert.match(html, /A product by <strong>Bluqq<\/strong>/);
+  assert.doesNotMatch(html, /id="(?:promptInput|enhanceInput)"/);
+  assert.match(html, /Decart, our AI processing provider/);
+  assert.match(html, /AI-generated video/);
+});
+
+test("built-in prompt and enhancement apply to both connection and reference updates", async () => {
+  const h = harness();
+  try {
+    await h.click("cameraButton");
+    await h.click("connectButton");
+    const initial = h.calls.decart[0][1].initialState.prompt;
+    assert.match(initial.text, /^Create a photorealistic professional webcam video/);
+    assert.match(initial.text, /consented reference person/);
+    assert.equal(initial.enhance, true);
+    await h.click("updateButton");
+    assert.equal(h.calls.updates.length, 1);
+    assert.equal(h.calls.updates[0].prompt, initial.text);
+    assert.equal(h.calls.updates[0].enhance, true);
   } finally { h.cleanup(); }
 });
 

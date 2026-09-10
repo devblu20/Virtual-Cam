@@ -1,6 +1,11 @@
 import { createDecartClient, models, resolveFpsNumber, type RealTimeClient } from "@decartai/sdk";
 import "./style.css";
 
+// Product defaults: used for both initial connections and reference updates.
+// This is frontend code, not a secret; the compiled prompt remains inspectable.
+const TRANSFORMATION_PROMPT = "Create a photorealistic professional webcam video using the identity and facial features of the attached consented reference person. Preserve the person’s face shape, skin tone, hairstyle, eyes, eyebrows, nose, facial hair, and age consistently across every frame. Follow the live speaker’s natural lip movements, blinking, expressions, and small head movements accurately. Keep the face stable with no flickering, stretching, melting, identity drift, duplicate features, warped mouth, distorted teeth, or changing hairstyle. Use realistic skin texture, soft indoor lighting, a fixed eye-level webcam angle, natural shoulders, and a clean neutral office background. Frame the person from the chest upward, centered like a normal Zoom call. Keep motion subtle and professional.";
+const ENHANCE_PROMPT = true;
+
 const el = <T extends HTMLElement>(id: string) => document.querySelector<T>("#" + id)!;
 const inputVideo = el<HTMLVideoElement>("inputVideo");
 const outputVideo = el<HTMLVideoElement>("outputVideo");
@@ -9,8 +14,6 @@ const outputPlaceholder = el<HTMLElement>("outputPlaceholder");
 const cameraSelect = el<HTMLSelectElement>("cameraSelect");
 const modelSelect = el<HTMLSelectElement>("modelSelect");
 const referenceInput = el<HTMLInputElement>("referenceInput");
-const promptInput = el<HTMLTextAreaElement>("promptInput");
-const enhanceInput = el<HTMLInputElement>("enhanceInput");
 const accessKey = el<HTMLInputElement>("accessKey");
 const consent = el<HTMLInputElement>("consent");
 const cameraButton = el<HTMLButtonElement>("cameraButton");
@@ -133,14 +136,14 @@ async function fetchToken(signal: AbortSignal): Promise<string> {
 }
 async function connect() {
   if (busy || connection || !camera) return;
-  if (!consent.checked) { showError(new Error("Agree to Decart processing before connecting.")); return; }
+  if (!consent.checked) { showError(new Error("Agree to the cloud-processing disclosure before connecting.")); return; }
   const reference = referenceInput.files?.[0];
   if (!reference) { showError(new Error("Choose a reference image.")); return; }
   if (!["image/png", "image/jpeg", "image/webp"].includes(reference.type) || reference.size > 10 * 1024 * 1024) {
     showError(new Error("Choose a PNG, JPEG, or WebP image smaller than 10 MB.")); return;
   }
   if (accessKey.value.trim().length < 32) {
-    showError(new Error("Enter the personal access key supplied by the owner, not a Decart API key.")); return;
+    showError(new Error("Enter the personal access key supplied by Bluqq, not a provider API key.")); return;
   }
   const ownVersion = ++version;
   busy = true;
@@ -153,7 +156,7 @@ async function connect() {
     showError(new Error("Connection timed out. Start the camera and try again."));
   }, 45000);
   notice.hidden = true;
-  status("Connecting to Decart…", "working");
+  status("Connecting to AI processing…", "working");
   syncControls();
   try {
     const token = await fetchToken(abort.signal);
@@ -162,7 +165,7 @@ async function connect() {
     const connected = await client.realtime.connect(camera, {
       model: model(),
       mirror: "auto",
-      initialState: { prompt: { text: promptInput.value.trim(), enhance: enhanceInput.checked }, image: reference },
+      initialState: { prompt: { text: TRANSFORMATION_PROMPT, enhance: ENHANCE_PROMPT }, image: reference },
       onRemoteStream: (stream: MediaStream) => {
         if (ownVersion !== version) { stream.getTracks().forEach(track => track.stop()); return; }
         if (remote && remote !== stream) remote.getTracks().forEach(track => track.stop());
@@ -217,7 +220,7 @@ async function update() {
   busy = true;
   syncControls();
   try {
-    await connection.set({ image: reference, prompt: promptInput.value.trim(), enhance: enhanceInput.checked });
+    await connection.set({ image: reference, prompt: TRANSFORMATION_PROMPT, enhance: ENHANCE_PROMPT });
     if (ownVersion === version) status("AI transformation live", "live");
   } catch (error) {
     if (ownVersion === version) showError(error);

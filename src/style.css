@@ -28,6 +28,9 @@ button, input, select, textarea { font: inherit; }
 header { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 22px; }
 h1 { margin: 2px 0 0; font-size: clamp(1.7rem, 3vw, 2.5rem); letter-spacing: -0.04em; }
 .eyebrow { margin: 0; color: #8390ad; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.16em; }
+.product-brand { margin: 8px 0 0; color: #aeb8cc; font-size: 0.9rem; }
+.product-brand strong { color: #a8baff; font-weight: 800; letter-spacing: 0.02em; }
+.footer-note .product-brand { margin: 0 0 8px; }
 
 .status { display: flex; align-items: center; gap: 9px; padding: 9px 13px; border: 1px solid #273044; border-radius: 999px; background: #101520; color: #aeb8cc; font-size: 0.88rem; }
 .status-dot { width: 9px; height: 9px; border-radius: 50%; background: #6d7890; }

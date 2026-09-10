@@ -110,11 +110,11 @@ def create_app() -> FastAPI:
                     )
             return {"apiKey": token.api_key}
         except TimeoutError:
-            raise HTTPException(504, "Decart timed out. Try again.") from None
+            raise HTTPException(504, "AI processing timed out. Try again.") from None
         except Exception:
             # Upstream exception text may contain credentials. Do not log it.
             logger.warning("Decart token request failed")
-            raise HTTPException(502, "Decart connection failed. Ask the owner to check the API key and credits.") from None
+            raise HTTPException(502, "AI processing connection failed. Ask Bluqq support to check service access and credits.") from None
 
     if dist.is_dir():
         app.mount("/", StaticFiles(directory=dist, html=True), name="frontend")
