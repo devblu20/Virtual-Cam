@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="How Virtual CAM handles camera video, reference images, access keys and other information.">
+  <title>Privacy Policy | Virtual CAM</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #182538; background: #f3f6fa; }
+    * { box-sizing: border-box; }
+    body { margin: 0; line-height: 1.7; }
+    main { max-width: 880px; margin: 40px auto; padding: 40px; background: #fff; border: 1px solid #dce4ee; border-radius: 16px; }
+    h1, h2 { line-height: 1.25; }
+    h1 { font-size: clamp(2rem, 6vw, 2.8rem); margin: 8px 0 16px; }
+    h2 { margin-top: 32px; font-size: 1.3rem; }
+    a { color: #145bb5; overflow-wrap: anywhere; }
+    a:focus-visible { outline: 3px solid #145bb5; outline-offset: 4px; }
+    li { margin-bottom: 10px; }
+    .brand { color: #145bb5; font-weight: 700; letter-spacing: .06em; }
+    .meta, footer { color: #526176; font-size: .94rem; }
+    .notice { padding: 16px 20px; background: #fff7df; border-left: 4px solid #ac7300; border-radius: 4px; }
+    footer { margin-top: 32px; padding-top: 20px; border-top: 1px solid #dce4ee; }
+    @media (max-width: 600px) { main { margin: 0; padding: 24px 18px; border: 0; border-radius: 0; } }
+    @media print { main { margin: 0; padding: 0; border: 0; } body { background: #fff; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="brand">VIRTUAL CAM</div>
+  <h1>Privacy Policy</h1>
+  <p class="meta">Publisher: virtual cam<br>Document updated: September 10, 2026<br>Privacy and support: <a href="mailto:devblu.work@gmail.com">devblu.work@gmail.com</a></p>
+
+  <aside class="notice" aria-label="Policy review status">
+    <strong>Review copy — provider and retention details remain unconfirmed.</strong>
+    This document describes the current extension integration. The publisher must confirm applicable provider agreements, retention arrangements and actual operating practices before adopting it as the final policy. It does not certify Chrome Web Store Limited Use compliance.
+  </aside>
+
+  <h2>1. Scope and purpose</h2>
+  <p>Virtual CAM is a browser extension that transforms camera video using a reference image and prompt during supported browser-based meetings. Processing requires a publisher-issued personal access key, not an in-extension signup. This notice covers the extension and its authorization service hosted on Railway. Other websites and meeting providers have their own privacy practices.</p>
+
+  <h2>2. Information handled and why</h2>
+  <ul>
+    <li><strong>Authentication:</strong> your personal access key is sent over HTTPS to our Railway-hosted service to authorize processing. The server compares a hash of that key with configured user access records and obtains a temporary Decart token. The publisher's master Decart key remains on the server.</li>
+    <li><strong>Images, prompts and video:</strong> your reference image, prompt and camera video are sent to Decart for AI processing when you enable transformation. Faces and surroundings may identify people or reveal private information. Transformed output is delivered to the meeting page.</li>
+    <li><strong>Audio:</strong> the current integration sends video-only input to Decart. For combined camera/microphone requests, the original microphone track is passed to the meeting rather than to the AI transformation. The meeting provider handles that audio under its own practices.</li>
+    <li><strong>Meeting-tab information:</strong> the extension reads the selected tab's URL and uses tab identifiers and enabled/blocked state to route controls. It does not request unrestricted browser-history access or send a general browsing-history list to our backend.</li>
+    <li><strong>Connection information:</strong> Railway, Decart and other infrastructure involved in connections may process IP addresses, timestamps and request metadata. Our backend uses temporary per-user request counters to limit abuse.</li>
+    <li><strong>Support:</strong> contacting our Gmail address provides your email address and message contents to the publisher and Google's email service. Do not send access keys, API keys or private meeting recordings in support messages.</li>
+  </ul>
+
+  <h2>3. Browser storage and retention</h2>
+  <p>The reference image, prompt and selected model are stored in extension local storage until replaced, cleared or removed with the extension. The personal key and session control state are stored in extension session storage, which Chrome clears on browser restart or extension reload, update or disable.</p>
+  <p>The current authorization application does not implement server-side storage of camera recordings or reference images. This is not a promise that processing providers or meeting services do not retain them. Access-key hashes remain in server configuration until changed or removed. Local clearing does not remove backend access records, infrastructure logs, support correspondence or provider-held data.</p>
+  <p>Exact retention periods for Railway logs, publisher support records and Decart processing data have not been verified for this deployment. Contact the publisher for retention information before sending sensitive material. No zero-retention or automatic deletion deadline is promised by this review copy.</p>
+
+  <h2>4. Who receives information</h2>
+  <p><strong>Railway</strong> hosts the publisher's authorization backend. <strong>Decart</strong> processes transformation inputs and produces output. <strong>Your meeting service and participants</strong> receive the video you transmit and normal meeting audio. <strong>Google/Gmail</strong> handles email you send to our support address. These providers may use infrastructure in countries different from yours.</p>
+  <p>Part of the extension runs inside the meeting page. That page receives the reference image, prompt and a temporary processing token; other scripts sharing its execution context could access them. The personal access key is not intentionally sent to that page. Use the integration only on trusted meeting sites.</p>
+
+  <h2>5. Decart processing and training</h2>
+  <p>Decart's published <a href="https://docs.platform.decart.ai/resources/api-terms">API Terms, section 2.3</a>, permit use of inputs and outputs to operate and improve services, develop products, and train AI models. This notice does not promise that your content is excluded from training. Any account-specific agreement changing those terms must be confirmed before a different promise can be made.</p>
+  <p>See Decart's <a href="https://docs.platform.decart.ai/resources/privacy-policy">Privacy Policy</a> and <a href="https://docs.platform.decart.ai/resources/dpa">Data Processing Agreement</a> for further provider information. Their applicability and the deployment's retention arrangements require publisher confirmation. Do not send confidential or sensitive meeting content when these terms are unsuitable for you.</p>
+  <p>The extension's application code does not implement advertising, payment collection or behavioral analytics. This statement does not describe or override all provider practices.</p>
+
+  <h2>6. Your choices and deletion requests</h2>
+  <ul>
+    <li>Do not enable transformation if you do not agree to sending the disclosed inputs for cloud processing.</li>
+    <li>Use the popup's Stop control to end transformation. To intentionally return to real video, use the explicit real-camera control and check the meeting preview.</li>
+    <li>Use Stop and clear saved data to clear the saved image, prompt, model and personal key. Some session control state can remain until the session ends.</li>
+    <li>Remove camera permission or uninstall the extension to prevent further extension use. Uninstalling does not delete data already shared with others.</li>
+    <li>Email <a href="mailto:devblu.work@gmail.com">devblu.work@gmail.com</a> to request access-key revocation, information about your data, or help with deletion. Describe the request without including credentials. Provider-held records and meeting recordings may require requests to the relevant provider; immediate or complete removal cannot be guaranteed.</li>
+  </ul>
+  <p>Revoking a key prevents new authorizations after the server configuration is updated; it does not necessarily terminate an already established processing session. Privacy rights and exceptions depend on the applicable law.</p>
+
+  <h2>7. Security and responsible use</h2>
+  <p>The token service uses HTTPS, server-side key hashing and authorization checks. Browser storage and any online service are not risk-free; do not share your personal key. Only use portraits you own or have permission to use. Keep the AI-generated video label visible and tell participants about the transformation. Do not use Virtual CAM for deceptive impersonation or identity-verification bypass.</p>
+
+  <h2>8. Updates and contact</h2>
+  <p>The document date identifies this version. Check this page for revisions. Questions about the extension, access records, or this notice can be sent to <a href="mailto:devblu.work@gmail.com">devblu.work@gmail.com</a>.</p>
+  <footer>virtual cam · <a href="https://virtual-cam-production-9734.up.railway.app/">Application website</a></footer>
+</main>
+</body>
+</html>
