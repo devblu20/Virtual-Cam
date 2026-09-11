@@ -36,6 +36,12 @@
         </article>
       </section>
 
+      <section class="quality-panel" aria-label="Video quality diagnostics">
+        <p class="hint" id="cameraDetails">Camera: not started</p>
+        <p class="hint" id="outputDetails">Output: not connected</p>
+        <p class="hint" id="networkDetails">Connection quality: not connected</p>
+      </section>
+
       <section class="control-panel">
         <div class="field field-wide">
           <label for="accessKey">Personal access key</label>
@@ -53,19 +59,36 @@
         <div class="field">
           <label for="modelSelect">Processing mode</label>
           <select id="modelSelect">
-            <option value="lucy-2.1" selected>Quality mode</option>
-            <option value="lucy-2.5">Smooth motion mode</option>
+            <option value="lucy-2.5" selected>HD detail — 1280 × 720 input</option>
+            <option value="lucy-2.1">Character alternative — 1088 × 624 input</option>
           </select>
+          <p class="hint">Try the character alternative if it matches your portrait better. More pixels alone do not guarantee a closer identity match.</p>
         </div>
 
         <div class="field field-wide">
-          <label for="referenceInput">Reference face</label>
-          <input id="referenceInput" type="file" accept="image/png,image/jpeg,image/webp" />
-          <p class="hint">Use a clear, front-facing portrait that you own or have permission to use.</p>
+          <label for="resolutionSelect">Requested output resolution</label>
+          <select id="resolutionSelect">
+            <option value="720p" selected>720p — standard</option>
+            <option value="1080p">1080p — where supported by the provider</option>
+          </select>
+          <p class="hint">1080p depends on model/account support and may increase bandwidth or service charges. If rejected, stop and reconnect at 720p. Check the received resolution above; a request is not a guarantee of native detail.</p>
         </div>
 
         <div class="field field-wide">
-          <p class="hint">Bluqq's built-in transformation settings are applied automatically. No prompt entry is needed.</p>
+          <label for="referenceInput">Reference portrait and upper body</label>
+          <input id="referenceInput" type="file" accept="image/png,image/jpeg,image/webp" aria-describedby="referenceGuidance referenceDetails referenceState" />
+          <p class="hint" id="referenceGuidance">Use one sharp, front-facing person with the full hair, beard, shoulders and upper-body clothing visible. At least 512 × 512 pixels; a sharp original around 1280 pixels on the long side is preferable. Avoid full-body shots with a tiny face. Match this chest-up framing in your camera and use even front lighting.</p>
+          <div class="reference-review">
+            <img id="referencePreview" alt="Selected reference portrait, shown without cropping" hidden />
+            <div>
+              <p class="hint" id="referenceDetails" aria-live="polite"></p>
+              <p class="hint" id="referenceState" aria-live="polite">Choose a reference before connecting.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="field field-wide">
+          <p class="hint">Bluqq's built-in settings target the reference face, hair, beard and upper-body clothing while following your live movement. No prompt entry is needed. AI output can differ from the reference; exact identity or unseen details cannot be guaranteed.</p>
           <label class="check-row"><input id="consent" type="checkbox" /> I have permission to use this image and agree to send my camera video, reference image, and the built-in prompt to our AI processing provider.</label>
           <p class="hint">Start camera previews locally without microphone capture. Connect starts cloud processing. Tell meeting participants when you use AI-generated video.</p>
         </div>

@@ -43,7 +43,7 @@ class StartupTests(unittest.TestCase):
                         self.fail("Server did not become healthy on the PORT environment variable.")
                     time.sleep(0.1)
             with urlopen(url, timeout=2) as response:
-                self.assertIn(b"Virtual CAM Cloud", response.read())
+                    self.assertIn(b"Virtual CAM | Bluqq", response.read())
             with self.assertRaises(HTTPError) as caught:
                 urlopen(Request(url + "/api/realtime-token", method="POST"), timeout=2)
             self.assertEqual(caught.exception.code, 401)
