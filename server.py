@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from reference_library import register_reference_routes
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
@@ -115,6 +116,8 @@ def create_app() -> FastAPI:
             # Upstream exception text may contain credentials. Do not log it.
             logger.warning("Decart token request failed")
             raise HTTPException(502, "AI processing connection failed. Ask Bluqq support to check service access and credits.") from None
+
+    register_reference_routes(app, access_keys)
 
     if dist.is_dir():
         app.mount("/", StaticFiles(directory=dist, html=True), name="frontend")

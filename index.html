@@ -89,6 +89,22 @@
         </div>
       </section>
 
+      <section class="control-panel" aria-labelledby="libraryHeading">
+        <div class="field field-wide">
+          <h2 id="libraryHeading">Your extension photo library</h2>
+          <p class="hint">Save the reference selected above to the library for the personal access key entered above. Use that same key in the extension to see it. Anyone sharing that key can view and delete these photos. No photo is uploaded just by choosing a file.</p>
+          <label for="referenceName">Photo name</label>
+          <input id="referenceName" maxlength="80" placeholder="For example: My meeting portrait" />
+          <label class="check-row"><input id="storageConsent" type="checkbox" /> I have permission to store this photo on Bluqq's Railway service and make it available to everyone using this personal access key.</label>
+          <p class="hint">PNG, JPEG or WebP, up to 2 MB, at least 512 × 512 and at most 16 megapixels. Up to 20 photos per user. Saved originals may include photo metadata. Photos remain until deleted. <a href="/privacy.html" target="_blank" rel="noopener">Read the privacy notice</a>.</p>
+          <div class="actions">
+            <button id="saveReferenceButton" type="button">Save to extension</button>
+            <button id="refreshLibraryButton" type="button" class="secondary">Show / refresh saved photos</button>
+          </div>
+          <p id="libraryStatus" class="hint" role="status" aria-live="polite">Saving a photo does not start AI processing or change an active meeting.</p>
+          <div id="referenceLibrary" class="saved-photo-grid"></div>
+        </div>
+      </section>
       <aside class="notice" id="notice" hidden></aside>
       <footer class="footer-note">
         <p class="product-brand">Virtual CAM — A product by <strong>Bluqq</strong></p>
@@ -96,5 +112,6 @@
       </footer>
     </main>
     <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/reference-library.js"></script>
   </body>
 </html>

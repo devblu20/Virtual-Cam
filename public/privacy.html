@@ -28,7 +28,7 @@
 <main>
   <div class="brand">VIRTUAL CAM</div>
   <h1>Privacy Policy</h1>
-  <p class="meta">Publisher: virtual cam<br>Document updated: September 10, 2026<br>Privacy and support: <a href="mailto:devblu.work@gmail.com">devblu.work@gmail.com</a></p>
+  <p class="meta">Publisher: Bluqq (virtual cam)<br>Document updated: September 15, 2026<br>Privacy and support: <a href="mailto:devblu.work@gmail.com">devblu.work@gmail.com</a></p>
 
   <aside class="notice" aria-label="Policy review status">
     <strong>Review copy — provider and retention details remain unconfirmed.</strong>
@@ -50,12 +50,14 @@
 
   <h2>3. Browser storage and retention</h2>
   <p>The reference image, prompt and selected model are stored in extension local storage until replaced, cleared or removed with the extension. The personal key and session control state are stored in extension session storage, which Chrome clears on browser restart or extension reload, update or disable.</p>
-  <p>The current authorization application does not implement server-side storage of camera recordings or reference images. This is not a promise that processing providers or meeting services do not retain them. Access-key hashes remain in server configuration until changed or removed. Local clearing does not remove backend access records, infrastructure logs, support correspondence or provider-held data.</p>
+  <p>The website's optional photo library stores an original reference image (which may contain embedded metadata), its name, a thumbnail and upload time on the publisher's Railway persistent storage. Saving requires a separate storage-permission checkbox and the Save to extension button. Choosing a file alone does not upload it. Each library belongs to a configured user identifier authorized by a personal access key. Anyone sharing that key can view and delete its photos. Saved photos remain until deleted through the website or removed by the publisher. Removing or rotating an access key does not automatically delete the associated library. Keep stable user identifiers when rotating keys; never assign an old identifier to a different person without removing its old library.</p>
+  <p>The extension loads the library when a personal key is entered or the popup opens with a session key, then refreshes every 20 seconds while open. Thumbnails appear for selection; starting transformation downloads the selected original. Library refresh does not change an active meeting. Deleting a photo removes it from the live library and prevents new library downloads, but does not erase copies already downloaded into browser storage, active sessions or provider-held data. Backups may retain earlier copies according to the publisher's backup arrangements; no backup-expiry period is promised here.</p>
+  <p>The application does not implement server-side storage of camera recordings. This is not a promise that processing providers or meeting services do not retain them. Access-key hashes remain in server configuration until changed or removed. Local clearing does not remove cloud library photos, backend access records, infrastructure logs, support correspondence or provider-held data.</p>
   <p>Exact retention periods for Railway logs, publisher support records and Decart processing data have not been verified for this deployment. Contact the publisher for retention information before sending sensitive material. No zero-retention or automatic deletion deadline is promised by this review copy.</p>
 
   <h2>4. Who receives information</h2>
   <p><strong>Railway</strong> hosts the publisher's authorization backend. <strong>Decart</strong> processes transformation inputs and produces output. <strong>Your meeting service and participants</strong> receive the video you transmit and normal meeting audio. <strong>Google/Gmail</strong> handles email you send to our support address. These providers may use infrastructure in countries different from yours.</p>
-  <p>Part of the extension runs inside the meeting page. That page receives the reference image, prompt and a temporary processing token; other scripts sharing its execution context could access them. The personal access key is not intentionally sent to that page. Use the integration only on trusted meeting sites.</p>
+  <p>Part of the extension runs inside the meeting page. On Meet and Zoom Web that page receives the selected reference image, prompt and a temporary processing token; other scripts sharing its execution context could access them. On Teams Web the provider SDK and token run in an isolated extension context, with output handed to the page. The personal access key and full photo library are not intentionally sent to meeting-page scripts. Use the integration only on trusted meeting sites.</p>
 
   <h2>5. Decart processing and training</h2>
   <p>Decart's published <a href="https://docs.platform.decart.ai/resources/api-terms">API Terms, section 2.3</a>, permit use of inputs and outputs to operate and improve services, develop products, and train AI models. This notice does not promise that your content is excluded from training. Any account-specific agreement changing those terms must be confirmed before a different promise can be made.</p>
@@ -66,7 +68,7 @@
   <ul>
     <li>Do not enable transformation if you do not agree to sending the disclosed inputs for cloud processing.</li>
     <li>Use the popup's Stop control to end transformation. To intentionally return to real video, use the explicit real-camera control and check the meeting preview.</li>
-    <li>Use Stop and clear saved data to clear the saved image, prompt, model and personal key. Some session control state can remain until the session ends.</li>
+    <li>Use Clear saved settings in the extension to clear its saved working image, prompt, model and personal key. Some session control state can remain until the session ends. Use the website's Delete saved photo controls to remove cloud-library photos separately.</li>
     <li>Remove camera permission or uninstall the extension to prevent further extension use. Uninstalling does not delete data already shared with others.</li>
     <li>Email <a href="mailto:devblu.work@gmail.com">devblu.work@gmail.com</a> to request access-key revocation, information about your data, or help with deletion. Describe the request without including credentials. Provider-held records and meeting recordings may require requests to the relevant provider; immediate or complete removal cannot be guaranteed.</li>
   </ul>

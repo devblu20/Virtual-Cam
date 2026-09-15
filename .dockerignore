@@ -13,3 +13,8 @@ tests
 scripts
 obs_control.py
 vcam_control.py
+data
+*.sqlite3
+*.sqlite3-journal
+*.sqlite3-wal
+*.sqlite3-shm
