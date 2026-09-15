@@ -9,29 +9,37 @@
   </head>
   <body>
     <main class="app-shell">
-      <header>
-        <div>
-          <p class="eyebrow">REALTIME CHARACTER TRANSFORM</p>
+      <header class="app-header">
+        <div class="brand-lockup">
+          <span class="brand-symbol" aria-hidden="true">b.</span>
+          <div>
+          <p class="eyebrow">BLUQQ CAMERA STUDIO</p>
           <h1>Virtual CAM</h1>
           <p class="product-brand">A product by <strong>Bluqq</strong></p>
+          </div>
         </div>
+        <nav class="page-nav" aria-label="Studio sections"><a href="#setupPanel">Camera setup</a><a href="#librarySection">Photo library <span aria-hidden="true">↗</span></a></nav>
+      </header>
+
+      <section class="studio-heading" aria-labelledby="studioTitle">
+        <div><p class="eyebrow">YOUR LOOK. IN MOTION.</p><h2 id="studioTitle">A new presence, in real time.</h2><p>Preview your transformation. Save your references. Bring them to your next browser meeting.</p></div>
         <div class="status" id="status" data-tone="idle">
           <span class="status-dot"></span>
           <span id="statusText">Ready</span>
         </div>
-      </header>
+      </section>
 
       <section class="video-grid">
         <article class="video-card input-card">
-          <div class="video-label">Camera input</div>
+          <div class="video-label"><span class="label-dot" aria-hidden="true"></span>Camera input</div>
           <video id="inputVideo" autoplay muted playsinline></video>
-          <div class="video-placeholder" id="inputPlaceholder">Start the camera to preview your input.</div>
+          <div class="video-placeholder" id="inputPlaceholder"><span class="placeholder-mark" aria-hidden="true">◉</span><strong>Your camera, live</strong><span>Start the camera below to preview your input.</span></div>
         </article>
 
         <article class="video-card output-card" id="outputCard">
-          <div class="video-label">AI-generated video</div>
+          <div class="video-label"><span class="label-dot accent" aria-hidden="true"></span>AI-generated video</div>
           <video id="outputVideo" autoplay muted playsinline></video>
-          <div class="video-placeholder" id="outputPlaceholder">Your transformed stream will appear here.</div>
+          <div class="video-placeholder" id="outputPlaceholder"><span class="placeholder-mark accent" aria-hidden="true">✧</span><strong>A new look starts here</strong><span>Your AI-transformed stream will appear here.</span></div>
           <button class="floating-button" id="fullscreenButton" type="button" disabled>Full-screen output</button>
         </article>
       </section>
@@ -42,11 +50,12 @@
         <p class="hint" id="networkDetails">Connection quality: not connected</p>
       </section>
 
-      <section class="control-panel">
+      <section class="control-panel" id="setupPanel" aria-labelledby="setupHeading">
+        <div class="section-heading field-wide"><span class="step-number" aria-hidden="true">01</span><div><h2 id="setupHeading">Set up your preview</h2><p>Connect your camera and choose a reference you have permission to use.</p></div><span class="section-tag">LIVE STUDIO</span></div>
         <div class="field field-wide">
           <label for="accessKey">Personal access key</label>
           <input id="accessKey" type="password" autocomplete="off" spellcheck="false" placeholder="Personal access key supplied by Bluqq" />
-          <p class="hint">Use your personal access key, not a provider API key. This page does not save your key or reference image in browser storage.</p>
+          <p class="hint">Your key connects the preview and your private photo library. Use a personal key, never a provider API key. This page does not save it in browser storage.</p>
         </div>
         <div class="field">
           <label for="cameraSelect">Camera</label>
@@ -58,12 +67,14 @@
 
         <div class="field">
           <label>Processing profile</label>
+          <details class="profile-details"><summary>Studio profile <span>View settings</span></summary>
           <p id="processingProfile">Bluqq extension 0.3.8 · Lucy 2.1</p>
           <p class="hint">Same built-in prompt and video settings as the supplied extension: 1088 × 624 preferred camera input, up to 25 fps, no input mirroring, and provider-default output resolution.</p>
           <p class="hint">For a fair comparison, upload the same portrait selected in the extension and use the same camera and lighting. Matching settings do not guarantee identical generated frames. This preview does not capture or delay microphone audio.</p>
+          </details>
         </div>
 
-        <div class="field field-wide">
+        <div class="field field-wide reference-upload">
           <label for="referenceInput">Reference portrait and upper body</label>
           <input id="referenceInput" type="file" accept="image/png,image/jpeg,image/webp" aria-describedby="referenceGuidance referenceDetails referenceState" />
           <p class="hint" id="referenceGuidance">Use one sharp, front-facing person with the full hair, beard, shoulders and upper-body clothing visible. At least 512 × 512 pixels; a sharp original around 1280 pixels on the long side is preferable. Avoid full-body shots with a tiny face. Match this chest-up framing in your camera and use even front lighting.</p>
@@ -81,7 +92,7 @@
           <label class="check-row"><input id="consent" type="checkbox" /> I have permission to use this image and agree to send my camera video, reference image, and the built-in prompt to our AI processing provider.</label>
           <p class="hint">Start camera previews locally without microphone capture. Connect starts cloud processing. Tell meeting participants when you use AI-generated video.</p>
         </div>
-        <div class="actions field-wide">
+        <div class="actions field-wide studio-actions">
           <button class="secondary" id="cameraButton" type="button">Start camera</button>
           <button class="primary" id="connectButton" type="button" disabled>Connect and transform</button>
           <button class="secondary" id="updateButton" type="button" disabled>Apply reference</button>
@@ -89,21 +100,33 @@
         </div>
       </section>
 
-      <section class="control-panel" aria-labelledby="libraryHeading">
-        <div class="field field-wide">
+      <section class="library-panel" id="librarySection" aria-labelledby="libraryHeading">
+        <div class="section-heading"><span class="step-number" aria-hidden="true">02</span><div>
           <h2 id="libraryHeading">Your extension photo library</h2>
-          <p class="hint">Save the reference selected above to the library for the personal access key entered above. Use that same key in the extension to see it. Anyone sharing that key can view and delete these photos. No photo is uploaded just by choosing a file.</p>
+          <p>Upload once. Choose it in your extension whenever you need it.</p></div><span class="section-tag">PRIVATE LIBRARY</span>
+        </div>
+        <div class="library-layout">
+        <div class="library-upload field">
+          <h3>Save a reference</h3>
+          <p class="hint">Save the photo selected in Camera setup above. It will appear in the extension using the same personal access key.</p>
+          <a class="text-link" href="#referenceInput">Choose or change your photo <span aria-hidden="true">↑</span></a>
           <label for="referenceName">Photo name</label>
-          <input id="referenceName" maxlength="80" placeholder="For example: My meeting portrait" />
+          <input id="referenceName" type="text" maxlength="80" autocomplete="off" placeholder="For example: My meeting portrait" />
           <label class="check-row"><input id="storageConsent" type="checkbox" /> I have permission to store this photo on Bluqq's Railway service and make it available to everyone using this personal access key.</label>
-          <p class="hint">PNG, JPEG or WebP, up to 2 MB, at least 512 × 512 and at most 16 megapixels. Up to 20 photos per user. Saved originals may include photo metadata. Photos remain until deleted. <a href="/privacy.html" target="_blank" rel="noopener">Read the privacy notice</a>.</p>
+          <p class="upload-specs">PNG, JPEG, WebP · Up to 2 MB<br>512 × 512 minimum · 16 megapixels maximum</p>
           <div class="actions">
-            <button id="saveReferenceButton" type="button">Save to extension</button>
-            <button id="refreshLibraryButton" type="button" class="secondary">Show / refresh saved photos</button>
+            <button id="saveReferenceButton" type="button" class="primary">Save to extension</button>
           </div>
-          <p id="libraryStatus" class="hint" role="status" aria-live="polite">Saving a photo does not start AI processing or change an active meeting.</p>
+          <p class="hint">Nothing uploads until you press Save. Saving does not start AI processing or change an active meeting.</p>
+        </div>
+        <div class="library-collection">
+          <div class="collection-heading"><div><h3>Saved photos</h3><span id="libraryCount" class="hint">Up to 20 photos per user</span></div><button id="refreshLibraryButton" type="button" class="secondary compact">Refresh photos</button></div>
+          <p id="libraryStatus" class="library-message" data-tone="idle" role="status" aria-live="polite">Enter your personal key above, then refresh to see your saved photos.</p>
+          <div id="libraryEmpty" class="library-empty"><span aria-hidden="true">▧</span><strong>Your references, all in one place</strong><p>Load this key's library or save your first photo.<br>No new extension ZIP is needed for photo changes.</p></div>
           <div id="referenceLibrary" class="saved-photo-grid"></div>
         </div>
+        </div>
+        <p class="library-footnote">Anyone sharing the same key can view and delete these photos. Saved originals may include photo metadata and remain until deleted. <a href="/privacy.html" target="_blank" rel="noopener">Privacy &amp; data use ↗</a></p>
       </section>
       <aside class="notice" id="notice" hidden></aside>
       <footer class="footer-note">

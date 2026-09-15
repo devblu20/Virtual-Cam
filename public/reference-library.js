@@ -7,20 +7,33 @@ const libraryStatus = libraryElement("libraryStatus");
 const libraryGrid = libraryElement("referenceLibrary");
 const saveReference = libraryElement("saveReferenceButton");
 const refreshLibrary = libraryElement("refreshLibraryButton");
+const libraryEmpty = libraryElement("libraryEmpty");
+const libraryCount = libraryElement("libraryCount");
 let libraryGeneration = 0;
 let libraryBusy = false;
+
+function libraryMessage(message, tone = "idle") {
+  libraryStatus.textContent = message;
+  libraryStatus.dataset.tone = tone;
+}
+function clearLibraryCards() {
+  libraryGrid.replaceChildren();
+  libraryEmpty.hidden = false;
+  libraryCount.textContent = "Up to 20 photos per user";
+}
 
 function setLibraryBusy(value) {
   libraryBusy = value;
   saveReference.disabled = value;
   refreshLibrary.disabled = value;
+  libraryGrid.setAttribute("aria-busy", String(value));
   for (const button of libraryGrid.querySelectorAll("button")) button.disabled = value;
 }
 function resetLibrary() {
   libraryGeneration++;
-  libraryGrid.replaceChildren();
+  clearLibraryCards();
   libraryElement("storageConsent").checked = false;
-  libraryStatus.textContent = "Press Show / refresh saved photos to load this key's library.";
+  libraryMessage("Press Refresh photos to load this key's library.");
 }
 libraryKey.addEventListener("input", resetLibrary);
 libraryInput.addEventListener("change", () => { libraryElement("storageConsent").checked = false; });
@@ -55,20 +68,24 @@ async function showLibrary(key, generation) {
       try {
         await libraryRequest(key, `/api/references/${encodeURIComponent(photo.id)}`, { method: "DELETE" });
         await showLibrary(key, generation);
-      } catch (error) { if (generation === libraryGeneration) libraryStatus.textContent = error.message; }
+      } catch (error) { if (generation === libraryGeneration) libraryMessage(error.message, "error"); }
       finally { setLibraryBusy(false); }
     });
     card.append(image, name, remove); libraryGrid.append(card);
   }
-  libraryStatus.textContent = `${data.references.length} / ${data.limit} photos saved. Open the extension with the same personal key; its library refreshes while the popup is open.`;
+  libraryEmpty.hidden = data.references.length > 0;
+  libraryCount.textContent = `${data.references.length} of ${data.limit} photos saved`;
+  libraryMessage(data.references.length
+    ? "Your library is up to date. These photos are available in the extension using the same personal key."
+    : "No saved photos yet. Choose a reference above, then save it to your extension.", "success");
 }
 refreshLibrary.addEventListener("click", async () => {
   if (libraryBusy) return;
   const key = libraryKey.value.trim(), generation = ++libraryGeneration;
-  libraryGrid.replaceChildren(); setLibraryBusy(true);
-  libraryStatus.textContent = "Loading saved photos…";
+  clearLibraryCards(); setLibraryBusy(true);
+  libraryMessage("Loading saved photos…", "loading");
   try { await showLibrary(key, generation); }
-  catch (error) { if (generation === libraryGeneration) libraryStatus.textContent = error.message; }
+  catch (error) { if (generation === libraryGeneration) libraryMessage(error.message, "error"); }
   finally { setLibraryBusy(false); }
 });
 saveReference.addEventListener("click", async () => {
@@ -81,13 +98,13 @@ saveReference.addEventListener("click", async () => {
     if (!file.size || file.size > 2 * 1024 * 1024) throw new Error("Use a non-empty image up to 2 MB for the extension library.");
     if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) throw new Error("Choose PNG, JPEG or WebP.");
     const name = libraryElement("referenceName").value.trim() || "Reference photo";
-    setLibraryBusy(true); libraryStatus.textContent = "Saving photo securely…";
+    setLibraryBusy(true); libraryMessage("Saving photo securely…", "loading");
     await libraryRequest(key, "/api/references", { method: "POST", body: file,
       headers: { "Content-Type": file.type, "X-Reference-Consent": "true", "X-Reference-Name": encodeURIComponent(name) } });
     if (generation !== libraryGeneration) return;
     libraryElement("storageConsent").checked = false;
     await showLibrary(key, generation);
-  } catch (error) { if (generation === libraryGeneration) libraryStatus.textContent = error.message; }
+  } catch (error) { if (generation === libraryGeneration) libraryMessage(error.message, "error"); }
   finally { setLibraryBusy(false); }
 });
 window.addEventListener("pagehide", resetLibrary);
