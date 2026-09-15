@@ -1,5 +1,9 @@
 # Reference-fidelity update — 2026-09-11
 
+> Historical notes: the model, prompt, capture and resolution settings below were
+> superseded on 2026-09-15 by the extension-matched video profile. For current
+> behavior and deployment steps, read [EXTENSION_PARITY.md](EXTENSION_PARITY.md).
+
 ## What changed
 
 - `src/main.ts` contains one built-in prompt targeting the reference's facial identity,

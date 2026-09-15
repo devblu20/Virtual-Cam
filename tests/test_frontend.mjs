@@ -9,6 +9,7 @@ const source = readFileSync(new URL("../src/main.ts", import.meta.url), "utf8")
   .replace(/^import .*from "@decartai\/sdk";/m, 'const { createDecartClient, models, resolveFpsNumber } = require("@decartai/sdk");')
   .replace('import "./style.css";', "");
 const compiled = (await transformWithOxc(source, "main.ts")).code.replace(/export\s*\{\s*\};?/g, "");
+const extensionProfile = JSON.parse(readFileSync(new URL("./fixtures/bluqq-0.3.8-video-profile.json", import.meta.url), "utf8"));
 
 function media() {
   const track = { stopped: false, settings: { width: 1280, height: 720, frameRate: 30 }, listeners: {}, stop() { this.stopped = true; },
@@ -38,14 +39,12 @@ function harness() {
     if (!elements.has(id)) elements.set(id, new Element());
     return elements.get(id);
   };
-  el("modelSelect").value = "lucy-2.5";
-  el("resolutionSelect").value = "720p";
   el("referenceInput").files = [{ type: "image/png", size: 1024 }];
   el("accessKey").value = "fake-test-access-key-12345678901234567890";
   el("consent").checked = true;
   const raw = media();
   const remote = media();
-  const calls = { fetch: [], decart: [], updates: [], camera: [], bitmapClosed: 0, disconnected: 0 };
+  const calls = { fetch: [], clients: [], decart: [], updates: [], camera: [], bitmapClosed: 0, disconnected: 0 };
   const connection = {
     disconnect() { calls.disconnected++; },
     on() {},
@@ -60,9 +59,9 @@ function harness() {
   const sdk = {
     models: { realtime: name => ({ name, width: name === "lucy-2.1" ? 1088 : 1280, height: name === "lucy-2.1" ? 624 : 720, fps: 30 }) },
     resolveFpsNumber: fps => fps,
-    createDecartClient: () => ({ realtime: { connect: (...args) => {
+    createDecartClient: options => { calls.clients.push(options); return { realtime: { connect: (...args) => {
       calls.decart.push(args); return hooks.connect(...args);
-    } } }),
+    } } }; },
   };
   const timers = new Set();
   const urls = new Set();
@@ -118,6 +117,9 @@ test("website uses Bluqq branding without editable prompt controls", () => {
   assert.doesNotMatch(html, /id="(?:promptInput|enhanceInput)"/);
   assert.match(html, /agree to send my camera video, reference image, and the built-in prompt/);
   assert.match(html, /AI-generated video/);
+  assert.match(html, /Bluqq extension 0\.3\.8 · Lucy 2\.1/);
+  assert.doesNotMatch(html, /id="(?:modelSelect|resolutionSelect)"/);
+  assert.match(html, /upload the same portrait/);
 });
 
 test("built-in prompt and enhancement apply to both connection and reference updates", async () => {
@@ -126,12 +128,15 @@ test("built-in prompt and enhancement apply to both connection and reference upd
     await h.click("cameraButton");
     await h.click("connectButton");
     const initial = h.calls.decart[0][1].initialState.prompt;
-    assert.match(initial.text, /^Replace the person in the live video/);
-    assert.match(initial.text, /consented person/);
+    assert.equal(initial.text, extensionProfile.prompt);
+    assert.match(initial.text, /^Replace the live person/);
+    assert.match(initial.text, /consented reference person/);
     assert.match(initial.text, /beard and moustache/);
     assert.match(initial.text, /hairline, hairstyle, hair color/);
-    assert.match(initial.text, /upper-body build, clothing/);
-    assert.ok(initial.text.length < 750);
+    assert.match(initial.text, /neck length and thickness/);
+    assert.match(initial.text, /upper-body build/);
+    assert.match(initial.text, /precise lip closures/);
+    assert.equal(initial.text.length, 792); // Exact ZIP parity, not provider acceptance proof.
     assert.equal(initial.enhance, false);
     assert.equal(h.calls.decart[0][1].initialState.image, h.el("referenceInput").files[0]);
     assert.match(h.el("referenceState").textContent, /Reference applied/);
@@ -218,34 +223,37 @@ test("double connect does not create multiple sessions", async () => {
   } finally { h.cleanup(); }
 });
 
-test("default HD model requests its native camera dimensions and explicit output resolution", async () => {
+test("video requests match the supplied extension model, ideal dimensions, fps and mirroring", async () => {
   const h = harness();
   try {
     await h.click("cameraButton");
-    assert.equal(h.calls.camera[0][0].video.width.exact, 1280);
-    assert.equal(h.calls.camera[0][0].video.height.exact, 720);
+    assert.equal(h.calls.camera[0][0].video.width.ideal, extensionProfile.width);
+    assert.equal(h.calls.camera[0][0].video.height.ideal, extensionProfile.height);
+    assert.equal(h.calls.camera[0][0].video.frameRate.ideal, extensionProfile.frameRate);
+    assert.equal(h.calls.camera[0][0].video.frameRate.max, extensionProfile.frameRate);
     assert.equal(h.calls.camera[0][0].audio, false);
-    h.el("resolutionSelect").value = "1080p";
     await h.click("connectButton");
-    assert.equal(h.calls.decart[0][1].model.name, "lucy-2.5");
-    assert.equal(h.calls.decart[0][1].resolution, "1080p");
-    assert.equal(h.el("resolutionSelect").disabled, true);
+    assert.equal(h.calls.decart[0][1].model.name, extensionProfile.model);
+    assert.equal(h.calls.decart[0][1].mirror, extensionProfile.mirror);
+    assert.equal(Object.hasOwn(h.calls.decart[0][1], "resolution"), false);
+    assert.equal(h.calls.clients[0].telemetry, false);
+    assert.equal(h.calls.clients[0].integration, "bluqq-website");
+    await h.click("stopButton");
+    // Stop disconnects an established SDK session; late results have version guards.
+    assert.equal(h.calls.disconnected, 1);
   } finally { h.cleanup(); }
 });
 
-test("unsupported exact camera size falls back to ideal and exposes a low-resolution warning", async () => {
+test("browser-negotiated low camera resolution is reported without another capture request", async () => {
   const h = harness();
   h.hooks.camera = async () => {
-    if (h.calls.camera.length === 1) {
-      const error = new Error("Unsupported dimensions"); error.name = "OverconstrainedError"; throw error;
-    }
-    h.raw.track.settings = { width: 640, height: 480, frameRate: 30 };
+    h.raw.track.settings = { width: 640, height: 480, frameRate: 25 };
     return h.raw;
   };
   try {
     await h.click("cameraButton");
-    assert.equal(h.calls.camera.length, 2);
-    assert.equal(h.calls.camera[1][0].video.width.ideal, 1280);
+    assert.equal(h.calls.camera.length, 1);
+    assert.equal(h.calls.camera[0][0].video.width.ideal, 1088);
     assert.match(h.el("cameraDetails").textContent, /640 × 480/);
     assert.equal(h.el("cameraDetails").dataset.tone, "warning");
   } finally { h.cleanup(); }
@@ -261,17 +269,18 @@ test("permission denial does not trigger a second camera request", async () => {
   } finally { h.cleanup(); }
 });
 
-test("switching model stops an existing camera so it must be recaptured at the new size", async () => {
+test("switching camera stops the old stream and preserves the fixed extension video profile", async () => {
   const h = harness();
   try {
     await h.click("cameraButton");
-    h.el("modelSelect").value = "lucy-2.1";
-    await h.change("modelSelect");
+    h.el("cameraSelect").value = "camera-two";
+    await h.change("cameraSelect");
     assert.equal(h.raw.track.stopped, true);
     assert.equal(h.el("connectButton").disabled, true);
     await h.click("cameraButton");
-    assert.equal(h.calls.camera[1][0].video.width.exact, 1088);
-    assert.equal(h.calls.camera[1][0].video.height.exact, 624);
+    assert.equal(h.calls.camera[1][0].video.deviceId.exact, "camera-two");
+    assert.equal(h.calls.camera[1][0].video.width.ideal, 1088);
+    assert.equal(h.calls.camera[1][0].video.height.ideal, 624);
   } finally { h.cleanup(); }
 });
 
@@ -362,12 +371,15 @@ test("diagnostics report real received dimensions and ignore stale network callb
   const h = harness();
   try {
     await h.click("cameraButton");
-    h.el("resolutionSelect").value = "1080p";
     await h.click("connectButton");
     h.el("outputVideo").videoWidth = 1280;
     h.el("outputVideo").videoHeight = 720;
     h.el("outputVideo").listeners.resize();
-    assert.match(h.el("outputDetails").textContent, /Received: 1280 × 720 · Requested: 1080p/);
+    assert.match(h.el("outputDetails").textContent, /Received: 1280 × 720 · Bluqq extension 0\.3\.8 profile/);
+    assert.equal(h.el("outputDetails").dataset.tone, "idle");
+    h.el("outputVideo").videoWidth = 640;
+    h.el("outputVideo").videoHeight = 360;
+    h.el("outputVideo").listeners.resize();
     assert.equal(h.el("outputDetails").dataset.tone, "warning");
     const quality = h.calls.decart[0][1].onConnectionQuality;
     quality({ quality: "poor", limitingFactor: "bandwidth", warmingUp: false, metrics: { fps: 12 } });

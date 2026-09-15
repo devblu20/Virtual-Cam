@@ -1,9 +1,14 @@
-import { createDecartClient, models, resolveFpsNumber, type RealTimeClient } from "@decartai/sdk";
+import { createDecartClient, models, type RealTimeClient } from "@decartai/sdk";
 import "./style.css";
 
-// Product defaults: used for both initial connections and reference updates.
+// Video profile from the supplied Bluqq ZIP (manifest version 0.3.8).
+// Keep initial connections and reference updates aligned. See EXTENSION_PARITY.md.
 // This is frontend code, not a secret; the compiled prompt remains inspectable.
-const TRANSFORMATION_PROMPT = "Replace the person in the live video with the consented person in the reference image, including the face and entire visible upper body. Match the reference person's facial identity, face shape, skin tone, hairline, hairstyle, hair color, beard and moustache shape, density and color. Match the reference's shoulders, upper-body build, clothing, neckline, colors and fabric details. Use the live video for pose, gestures, blinking and lip movement only. Keep the reference appearance consistent as the person moves, with natural skin and hair texture. Preserve the live background and lighting.";
+// This exact 792-character ZIP prompt needs live provider validation; do not
+// silently shorten it on one client or retry paid sessions with a different prompt.
+const TRANSFORMATION_PROMPT = "Replace the live person with the consented reference person. Match facial identity, face shape, skin tone, hairline, hairstyle, hair color, beard and moustache shape, density and color. Match the reference's neck length and thickness, shoulder width and slope, chest width, torso shape and upper-body build. Keep the head, neck, shoulders and chest naturally connected, with consistent reference proportions as the person moves; avoid stretching, narrowing or abrupt changes. Match clothing, neckline, colors and fabric details. Use live video for pose, gestures, blinking, precise lip closures, jaw motion and speaking rhythm, preserving reference appearance. Do not invent or exaggerate mouth or tongue movements. Maintain natural skin and hair texture and the live background and lighting.";
+const EXTENSION_MODEL = "lucy-2.1";
+const CAMERA_FPS = 25;
 // Keep the explicit identity/clothing instructions intact instead of rewriting them.
 const ENHANCE_PROMPT = false;
 
@@ -13,8 +18,6 @@ const outputVideo = el<HTMLVideoElement>("outputVideo");
 const inputPlaceholder = el<HTMLElement>("inputPlaceholder");
 const outputPlaceholder = el<HTMLElement>("outputPlaceholder");
 const cameraSelect = el<HTMLSelectElement>("cameraSelect");
-const modelSelect = el<HTMLSelectElement>("modelSelect");
-const resolutionSelect = el<HTMLSelectElement>("resolutionSelect");
 const referenceInput = el<HTMLInputElement>("referenceInput");
 const referencePreview = el<HTMLImageElement>("referencePreview");
 const referenceDetails = el<HTMLElement>("referenceDetails");
@@ -41,10 +44,9 @@ let checkingReference = false;
 let preparedReference: File | null = null;
 let appliedReference: File | null = null;
 let referenceUrl: string | null = null;
-let requestedResolution = "720p";
 
 function model() {
-  return models.realtime(modelSelect.value === "lucy-2.1" ? "lucy-2.1" : "lucy-2.5");
+  return models.realtime(EXTENSION_MODEL);
 }
 function syncReferenceState() {
   referenceState.textContent = checkingReference ? "Checking image locally…"
@@ -112,11 +114,12 @@ function updateOutputDetails() {
   if (!remote) { outputDetails.textContent = "Output: not connected"; outputDetails.dataset.tone = "idle"; return; }
   const width = outputVideo.videoWidth;
   const height = outputVideo.videoHeight;
-  const belowRequest = !!(width && height && Math.min(width, height) < (requestedResolution === "1080p" ? 1080 : 720));
+  const target = model();
+  const belowTarget = !!(width && height && width * height < target.width * target.height);
   outputDetails.textContent = width && height
-    ? `Received: ${width} × ${height} · Requested: ${requestedResolution}${belowRequest ? " — provider/network is delivering less than requested." : ""}`
-    : `Requested: ${requestedResolution} · Waiting for decoded video dimensions…`;
-  outputDetails.dataset.tone = belowRequest ? "warning" : "idle";
+    ? `Received: ${width} × ${height} · Bluqq extension 0.3.8 profile${belowTarget ? " — lower pixel count than the model input; inspect output detail." : ""}`
+    : "Output: provider default, matching the extension · Waiting for decoded video dimensions…";
+  outputDetails.dataset.tone = belowTarget ? "warning" : "idle";
 }
 function status(text: string, tone = "idle") {
   el<HTMLElement>("statusText").textContent = text;
@@ -130,8 +133,6 @@ function showError(error: unknown) {
 function syncControls() {
   cameraButton.disabled = busy || !!connection;
   cameraSelect.disabled = busy || !!connection;
-  modelSelect.disabled = busy || !!connection;
-  resolutionSelect.disabled = busy || !!connection;
   referenceInput.disabled = busy;
   consent.disabled = busy || !!connection;
   accessKey.disabled = busy || !!connection;
@@ -193,23 +194,14 @@ async function startCamera() {
       audio: false,
       video: {
         deviceId: cameraSelect.value ? { exact: cameraSelect.value } : undefined,
-        width: { exact: selected.width },
-        height: { exact: selected.height },
-        frameRate: { ideal: resolveFpsNumber(selected.fps, 25), max: resolveFpsNumber(selected.fps, 25) },
+        width: { ideal: selected.width },
+        height: { ideal: selected.height },
+        frameRate: { ideal: CAMERA_FPS, max: CAMERA_FPS },
       },
     };
-    let stream: MediaStream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia(constraints);
-    } catch (error) {
-      if (ownVersion !== version) return;
-      // Retry only unsupported dimensions, never denied permission or a busy camera.
-      if (!(error instanceof Error) || error.name !== "OverconstrainedError") throw error;
-      stream = await navigator.mediaDevices.getUserMedia({
-        ...constraints,
-        video: { ...(constraints.video as MediaTrackConstraints), width: { ideal: selected.width }, height: { ideal: selected.height } },
-      });
-    }
+    // Match the extension's ideal size and fixed 25 fps cap. The browser may
+    // negotiate a different size; report the actual settings above the controls.
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
     if (ownVersion !== version) {
       stream.getTracks().forEach(track => track.stop());
       return;
@@ -264,17 +256,20 @@ async function connect() {
   notice.hidden = true;
   status("Connecting to AI processing…", "working");
   networkDetails.textContent = "Connection quality: waiting for measurements…";
-  const resolution = resolutionSelect.value === "1080p" ? "1080p" : "720p";
-  requestedResolution = resolution;
   syncControls();
   try {
     const token = await fetchToken(abort.signal);
     if (ownVersion !== version) return;
-    const client = createDecartClient({ apiKey: token });
+    const client = createDecartClient({
+      apiKey: token,
+      telemetry: false,
+      logger: { debug() {}, info() {}, warn() {}, error() {} },
+      integration: "bluqq-website",
+    });
     const connected = await client.realtime.connect(camera, {
       model: model(),
-      mirror: "auto",
-      resolution,
+      mirror: false,
+      // No resolution override: use the same provider default as the ZIP.
       initialState: { prompt: { text: TRANSFORMATION_PROMPT, enhance: ENHANCE_PROMPT }, image: reference },
       onRemoteStream: (stream: MediaStream) => {
         if (ownVersion !== version) { stream.getTracks().forEach(track => track.stop()); return; }
@@ -350,8 +345,8 @@ connectButton.addEventListener("click", () => void connect());
 updateButton.addEventListener("click", () => void update());
 stopButton.addEventListener("click", stop);
 referenceInput.addEventListener("change", () => void prepareReference());
-// A new model/device needs fresh camera constraints, not an old low-resolution stream.
-for (const control of [modelSelect, cameraSelect]) control.addEventListener("change", () => {
+// A new device needs fresh camera constraints.
+cameraSelect.addEventListener("change", () => {
   if (camera) { stop(); status("Settings changed — start camera again"); }
 });
 inputVideo.addEventListener("loadedmetadata", updateCameraDetails);

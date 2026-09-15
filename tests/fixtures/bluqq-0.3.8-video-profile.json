@@ -1,0 +1,12 @@
+{
+  "source": "User-supplied Bluqq-Virtual-CAM-0.3.2.zip, manifest version 0.3.8; reviewed 2026-09-15",
+  "presetsSha256": "defcff21b5ff88065330f81405789b5f4b45f10f5a8a93c677c1c424738da750",
+  "model": "lucy-2.1",
+  "width": 1088,
+  "height": 624,
+  "frameRate": 25,
+  "mirror": false,
+  "enhance": false,
+  "resolution": "provider-default",
+  "prompt": "Replace the live person with the consented reference person. Match facial identity, face shape, skin tone, hairline, hairstyle, hair color, beard and moustache shape, density and color. Match the reference's neck length and thickness, shoulder width and slope, chest width, torso shape and upper-body build. Keep the head, neck, shoulders and chest naturally connected, with consistent reference proportions as the person moves; avoid stretching, narrowing or abrupt changes. Match clothing, neckline, colors and fabric details. Use live video for pose, gestures, blinking, precise lip closures, jaw motion and speaking rhythm, preserving reference appearance. Do not invent or exaggerate mouth or tongue movements. Maintain natural skin and hair texture and the live background and lighting."
+}

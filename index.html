@@ -57,21 +57,10 @@
         </div>
 
         <div class="field">
-          <label for="modelSelect">Processing mode</label>
-          <select id="modelSelect">
-            <option value="lucy-2.5" selected>HD detail — 1280 × 720 input</option>
-            <option value="lucy-2.1">Character alternative — 1088 × 624 input</option>
-          </select>
-          <p class="hint">Try the character alternative if it matches your portrait better. More pixels alone do not guarantee a closer identity match.</p>
-        </div>
-
-        <div class="field field-wide">
-          <label for="resolutionSelect">Requested output resolution</label>
-          <select id="resolutionSelect">
-            <option value="720p" selected>720p — standard</option>
-            <option value="1080p">1080p — where supported by the provider</option>
-          </select>
-          <p class="hint">1080p depends on model/account support and may increase bandwidth or service charges. If rejected, stop and reconnect at 720p. Check the received resolution above; a request is not a guarantee of native detail.</p>
+          <label>Processing profile</label>
+          <p id="processingProfile">Bluqq extension 0.3.8 · Lucy 2.1</p>
+          <p class="hint">Same built-in prompt and video settings as the supplied extension: 1088 × 624 preferred camera input, up to 25 fps, no input mirroring, and provider-default output resolution.</p>
+          <p class="hint">For a fair comparison, upload the same portrait selected in the extension and use the same camera and lighting. Matching settings do not guarantee identical generated frames. This preview does not capture or delay microphone audio.</p>
         </div>
 
         <div class="field field-wide">
