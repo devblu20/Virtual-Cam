@@ -19,6 +19,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from reference_library import register_reference_routes
+from usage_history import register_usage_routes, small_json, usage_metadata
+from starlette.concurrency import run_in_threadpool
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
@@ -53,6 +55,15 @@ def create_app() -> FastAPI:
     daily_requests: dict[str, deque[float]] = defaultdict(deque)
     global_requests: deque[float] = deque()
     quota_lock = asyncio.Lock()
+    usage_store = register_usage_routes(app, access_keys)
+
+    async def record_usage(method, *args):
+        # An analytics outage must not stop a camera session. Never log input data.
+        try:
+            return await run_in_threadpool(method, *args)
+        except HTTPException:
+            logger.warning("Usage history unavailable; video authorization continues")
+            return None
 
     @app.middleware("http")
     async def headers(request: Request, call_next):
@@ -88,6 +99,8 @@ def create_app() -> FastAPI:
         if user is None:
             raise HTTPException(401, "Access key is invalid or revoked.")
 
+        usage = usage_metadata(await small_json(request))
+
         async with quota_lock:
             now = time.monotonic()
             limits = [(minute_requests[user], 60, 5), (daily_requests[user], 86400, 50),
@@ -101,6 +114,7 @@ def create_app() -> FastAPI:
                                         headers={"Retry-After": str(retry)})
             for bucket, _, _ in limits:
                 bucket.append(now)
+        usage_id = await record_usage(usage_store.start, user, usage) if usage else None
         try:
             async with asyncio.timeout(25):
                 async with DecartClient(api_key=api_key) as client:
@@ -109,10 +123,17 @@ def create_app() -> FastAPI:
                         allowed_models=["lucy-2.1", "lucy-2.5"],
                         metadata={"app": "virtualcam-cloud"},
                     )
-            return {"apiKey": token.api_key}
+            result = {"apiKey": token.api_key}
+            if usage:
+                result.update(usageSessionId=usage_id, usageRecorded=bool(usage_id))
+            return result
         except TimeoutError:
+            if usage_id:
+                await record_usage(usage_store.fail, usage_id, "provider_timeout")
             raise HTTPException(504, "AI processing timed out. Try again.") from None
         except Exception:
+            if usage_id:
+                await record_usage(usage_store.fail, usage_id, "provider_error")
             # Upstream exception text may contain credentials. Do not log it.
             logger.warning("Decart token request failed")
             raise HTTPException(502, "AI processing connection failed. Ask Bluqq support to check service access and credits.") from None

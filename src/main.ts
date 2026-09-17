@@ -1,5 +1,6 @@
 import { createDecartClient, models, type RealTimeClient } from "@decartai/sdk";
 import "./style.css";
+import { UsageReporter, referenceMetadata } from "./usage";
 
 // Video profile from the supplied Bluqq ZIP (manifest version 0.3.8).
 // Keep initial connections and reference updates aligned. See EXTENSION_PARITY.md.
@@ -44,6 +45,7 @@ let checkingReference = false;
 let preparedReference: File | null = null;
 let appliedReference: File | null = null;
 let referenceUrl: string | null = null;
+let usage: UsageReporter | null = null;
 
 function model() {
   return models.realtime(EXTENSION_MODEL);
@@ -157,8 +159,10 @@ function clearRemote() {
   networkDetails.textContent = "Connection quality: not connected";
   networkDetails.dataset.tone = "idle";
 }
-function stop() {
+function stop(reason = "stopped") {
   ++version;
+  usage?.stop(reason);
+  usage = null;
   pending?.abort();
   pending = null;
   busy = false;
@@ -221,16 +225,20 @@ async function startCamera() {
     if (ownVersion === version) { busy = false; syncControls(); }
   }
 }
-async function fetchToken(signal: AbortSignal): Promise<string> {
+async function fetchToken(signal: AbortSignal, reporter: UsageReporter, reference: File): Promise<string> {
+  const avatar = await referenceMetadata(reference);
+  signal.throwIfAborted();
   const response = await fetch("/api/realtime-token", {
     method: "POST",
-    headers: { Authorization: "Bearer " + accessKey.value.trim() },
+    headers: { Authorization: "Bearer " + accessKey.value.trim(), "Content-Type": "application/json" },
+    body: JSON.stringify({ usage: { source: "website", platform: "website", version: "usage-v1", avatar } }),
     signal,
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || typeof payload.apiKey !== "string") {
     throw new Error(payload.detail || "Could not create a connection token.");
   }
+  reporter.attach(payload.usageSessionId);
   return payload.apiKey;
 }
 async function connect() {
@@ -244,6 +252,10 @@ async function connect() {
     showError(new Error("Enter the personal access key supplied by Bluqq, not a provider API key.")); return;
   }
   const ownVersion = ++version;
+  const reporter = new UsageReporter(accessKey.value.trim(), message => {
+    if (ownVersion === version) el<HTMLElement>("usageNotice").textContent = message;
+  });
+  usage = reporter;
   busy = true;
   pending = new AbortController();
   const abort = pending;
@@ -258,7 +270,7 @@ async function connect() {
   networkDetails.textContent = "Connection quality: waiting for measurements…";
   syncControls();
   try {
-    const token = await fetchToken(abort.signal);
+    const token = await fetchToken(abort.signal, reporter, reference);
     if (ownVersion !== version) return;
     const client = createDecartClient({
       apiKey: token,
@@ -276,6 +288,7 @@ async function connect() {
         if (remote && remote !== stream) remote.getTracks().forEach(track => track.stop());
         remote = stream;
         outputVideo.srcObject = stream;
+        reporter.watch(outputVideo);
         updateOutputDetails();
         outputPlaceholder.hidden = false;
         void outputVideo.play().then(() => {
@@ -297,7 +310,7 @@ async function connect() {
       onConnectionChange: (state) => {
         if (ownVersion !== version) return;
         if (state === "disconnected") {
-          stop();
+          stop("disconnected");
           status("Disconnected", "error");
           showError(new Error("The session ended. Start the camera and reconnect when ready."));
         }
@@ -309,14 +322,14 @@ async function connect() {
     appliedReference = reference;
     connected.on("error", (error) => {
       if (ownVersion !== version) return;
-      stop();
+      stop("failed");
       status("Connection failed", "error");
       showError(error);
     });
   } catch (error) {
     if (ownVersion === version) {
       // Invalidate all callbacks belonging to the failed connection.
-      stop();
+      stop("failed");
       status("Connection failed", "error");
       showError(error);
     }
@@ -332,8 +345,10 @@ async function update() {
   busy = true;
   syncControls();
   try {
+    const avatar = await referenceMetadata(reference);
+    if (ownVersion !== version || !connection) return;
     await connection.set({ image: reference, prompt: TRANSFORMATION_PROMPT, enhance: ENHANCE_PROMPT });
-    if (ownVersion === version) { appliedReference = reference; notice.hidden = true; status("AI transformation live", "live"); }
+    if (ownVersion === version) { usage?.avatar(avatar); appliedReference = reference; notice.hidden = true; status("AI transformation live", "live"); }
   } catch (error) {
     if (ownVersion === version) showError(error);
   } finally {
@@ -343,7 +358,7 @@ async function update() {
 cameraButton.addEventListener("click", () => void startCamera());
 connectButton.addEventListener("click", () => void connect());
 updateButton.addEventListener("click", () => void update());
-stopButton.addEventListener("click", stop);
+stopButton.addEventListener("click", () => stop());
 referenceInput.addEventListener("change", () => void prepareReference());
 // A new device needs fresh camera constraints.
 cameraSelect.addEventListener("change", () => {
@@ -356,9 +371,9 @@ outputVideo.addEventListener("resize", updateOutputDetails);
 consent.addEventListener("change", syncControls);
 el<HTMLButtonElement>("refreshCamerasButton").addEventListener("click", () => void loadCameras().catch(showError));
 fullscreenButton.addEventListener("click", () => void el<HTMLElement>("outputCard").requestFullscreen().catch(showError));
-window.addEventListener("pagehide", () => { stop(); ++referenceVersion; checkingReference = false; preparedReference = null; releaseReferencePreview(); });
+window.addEventListener("pagehide", () => { stop("closed"); ++referenceVersion; checkingReference = false; preparedReference = null; releaseReferencePreview(); });
 window.addEventListener("pageshow", () => { if (referenceInput.files?.[0] && !preparedReference) void prepareReference(); });
-window.addEventListener("beforeunload", stop);
+window.addEventListener("beforeunload", () => stop("closed"));
 syncControls();
 if (!navigator.mediaDevices?.getUserMedia) {
   cameraButton.disabled = true;

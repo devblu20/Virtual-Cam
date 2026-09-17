@@ -3,11 +3,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
+import { createHash } from "node:crypto";
 import { transformWithOxc } from "vite";
 
-const source = readFileSync(new URL("../src/main.ts", import.meta.url), "utf8")
+const usageSource = readFileSync(new URL("../src/usage.ts", import.meta.url), "utf8").replace(/^export /gm, "");
+const source = usageSource + "\n" + readFileSync(new URL("../src/main.ts", import.meta.url), "utf8")
   .replace(/^import .*from "@decartai\/sdk";/m, 'const { createDecartClient, models, resolveFpsNumber } = require("@decartai/sdk");')
-  .replace('import "./style.css";', "");
+  .replace('import "./style.css";', "")
+  .replace('import { UsageReporter, referenceMetadata } from "./usage";', "");
 const compiled = (await transformWithOxc(source, "main.ts")).code.replace(/export\s*\{\s*\};?/g, "");
 const extensionProfile = JSON.parse(readFileSync(new URL("./fixtures/bluqq-0.3.8-video-profile.json", import.meta.url), "utf8"));
 
@@ -34,6 +37,8 @@ function harness() {
     removeAttribute(name) { delete this[name]; }
     play() { return Promise.resolve(); }
     requestFullscreen() { return Promise.resolve(); }
+    requestVideoFrameCallback(fn) { this.frame = fn; return 1; }
+    cancelVideoFrameCallback() { this.frame = null; }
   }
   const el = (id) => {
     if (!elements.has(id)) elements.set(id, new Element());
@@ -51,8 +56,9 @@ function harness() {
     async set(state) { calls.updates.push(state); },
   };
   const hooks = {
+    now: 0,
     camera: async () => raw,
-    decode: async file => ({ width: file.width ?? 1024, height: file.height ?? 1280, close() { calls.bitmapClosed++; } }),
+    decode: async file => { file.arrayBuffer ??= async () => new ArrayBuffer(8); return { width: file.width ?? 1024, height: file.height ?? 1280, close() { calls.bitmapClosed++; } }; },
     fetch: async () => ({ ok: true, json: async () => ({ apiKey: "short-lived-test-token" }) }),
     connect: async (_stream, options) => { options.onRemoteStream(remote); return connection; },
   };
@@ -81,6 +87,7 @@ function harness() {
     },
     Option: class {},
     AbortController,
+    AbortSignal, crypto: { subtle: { digest: async (_, bytes) => Uint8Array.from(createHash("sha256").update(new Uint8Array(bytes)).digest()).buffer } }, performance: { now: () => hooks.now },
     Error,
     URL: { createObjectURL: () => { const url = `blob:test-${urls.size}`; urls.add(url); return url; }, revokeObjectURL: url => urls.delete(url) },
     createImageBitmap: file => hooks.decode(file),
@@ -108,6 +115,45 @@ test("connect sends personal auth and renders only transformed output", async ()
     assert.equal(h.raw.track.stopped, true);
     assert.equal(h.remote.track.stopped, true);
     assert.equal(h.el("outputVideo").srcObject, null);
+  } finally { h.cleanup(); }
+});
+
+test("usage tracks decoded frames, throttles heartbeats, and sends a final stop", async () => {
+  const h = harness();
+  try {
+    h.hooks.fetch = async url => ({ ok: true, json: async () => url === "/api/realtime-token"
+      ? { apiKey: "token", usageSessionId: "12345678-1234-4123-8123-123456789abc" } : { ok: true } });
+    await h.click("cameraButton"); await h.click("connectButton");
+    assert.equal(h.calls.fetch.length, 1); // Connected socket alone is not video activity.
+    h.el("outputVideo").frame(); await flush();
+    h.el("outputVideo").frame(); await flush();
+    assert.equal(h.calls.fetch.length, 2);
+    h.hooks.now = 20001; h.el("outputVideo").frame(); await flush();
+    await h.click("stopButton");
+    const events = h.calls.fetch.slice(1).map(([, options]) => JSON.parse(options.body));
+    assert.deepEqual(events.map(e => e.action), ["pulse", "pulse", "end"]);
+    assert.deepEqual(events.map(e => e.sequence), [1, 2, 3]);
+    assert.equal(h.calls.fetch.at(-1)[1].keepalive, true);
+    assert.equal(h.el("outputVideo").frame, null);
+    const meta = JSON.parse(h.calls.fetch[0][1].body).usage;
+    assert.equal(meta.platform, "website"); assert.match(meta.avatar.digest, /^[a-f0-9]{64}$/);
+  } finally { h.cleanup(); }
+});
+
+test("reference application logs avatar only on success and reporting failures do not stop video", async () => {
+  const h = harness();
+  try {
+    h.hooks.fetch = async url => ({ ok: url === "/api/realtime-token", json: async () => ({ apiKey: "token", usageSessionId: "12345678-1234-4123-8123-123456789abc" }) });
+    await h.click("cameraButton"); await h.click("connectButton");
+    h.el("outputVideo").frame(); await flush();
+    assert.match(h.el("usageNotice").textContent, /interrupted/);
+    assert.equal(h.el("outputVideo").srcObject, h.remote);
+    h.connection.set = async () => { throw new Error("provider rejected update"); };
+    await h.click("updateButton");
+    assert.equal(h.calls.fetch.filter(([, options]) => JSON.parse(options.body).action === "avatar").length, 0);
+    h.connection.set = async () => {};
+    await h.click("updateButton");
+    assert.equal(JSON.parse(h.calls.fetch.at(-1)[1].body).action, "avatar");
   } finally { h.cleanup(); }
 });
 
