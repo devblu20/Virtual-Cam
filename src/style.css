@@ -43,7 +43,7 @@ h1 { margin: 2px 0 0; font-size: clamp(1.7rem, 3vw, 2.5rem); letter-spacing: -0.
 .brand-lockup .product-brand { margin-top: 3px; font-size: 12px; }
 .page-nav { display: flex; gap: 8px; flex-wrap: wrap; }
 .page-nav a { color: #c1ccdd; text-decoration: none; padding: 10px 14px; border-radius: 9px; font-size: 13px; }
-.page-nav a:last-child { background: #182335; border: 1px solid #304158; }
+.page-nav .admin-link { background: #173129; border: 1px solid #426456; color: #beecda; }
 .page-nav a:hover { background: #202e43; }
 .studio-heading { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-bottom: 24px; }
 .studio-heading h2 { font-size: clamp(24px, 3vw, 34px); line-height: 1.2; letter-spacing: -.04em; margin: 10px 0; }

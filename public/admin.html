@@ -1,13 +1,74 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Usage history | Bluqq</title><link rel="stylesheet" href="/admin.css"></head>
-<body><main>
-<header><div><p class="eyebrow">BLUQQ / VIRTUAL CAM</p><h1>Usage history</h1><p>Administrator only · Usage metadata, not meeting recordings</p></div><a href="/">Back to Virtual CAM ↗</a></header>
-<section id="loginPanel"><form id="login"><label for="adminKey">Administrator access key</label><div class="login-row"><input id="adminKey" type="password" autocomplete="off" spellcheck="false" required minlength="32" maxlength="256" placeholder="Separate from personal access keys"><button>Unlock history</button></div><p class="muted">Held in this page's memory only. Never enter your Decart API key here.</p></form></section>
-<p id="message" role="status" aria-live="polite">Enter your administrator key to load records.</p>
-<div id="dashboard" hidden>
-<section><form id="filters" class="filters"><label>User identifier<input id="owner" maxlength="64" placeholder="All users"></label><label>Platform<select id="platform"><option value="">All platforms</option><option value="website">Website</option><option value="meet">Google Meet</option><option value="zoom">Zoom Web</option><option value="teams">Teams Web</option></select></label><label>From (local time)<input id="after" type="date"></label><label>Through (local time)<input id="before" type="date"></label><button>Apply / refresh</button><button id="logout" type="button" class="secondary">Lock history</button></form></section>
-<div class="metrics"><section><p>Sessions / attempts</p><strong id="count">—</strong></section><section><p>Reported activity time</p><strong id="duration">—</strong></section><section><p>User identifiers</p><strong id="users">—</strong></section></div>
-<p class="muted">Durations are estimates from client activity reports, not billing or attendance evidence. Gaps over 45 seconds are excluded. Interrupted / unconfirmed means no recent report, not a verified disconnect. Shared personal keys identify an account, not a specific person. Old extension versions do not report usage.</p>
-<section class="records"><div class="table-scroll"><table><thead><tr><th>Started / requested</th><th>User</th><th>Platform</th><th>Avatar(s) / time</th><th>Activity</th><th>State / end</th></tr></thead><tbody id="records"></tbody></table></div><p id="empty" hidden>No matching sessions yet.</p><div class="pagination"><button id="previous" class="secondary">← Previous</button><span id="page"></span><button id="next" class="secondary">Next →</button></div></section>
-</div><footer>Only new instrumented sessions appear. No historical activity is reconstructed. <a href="/privacy.html">Privacy &amp; data use</a></footer>
-</main><script src="/admin.js" defer></script></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Usage overview | Bluqq</title>
+  <link rel="stylesheet" href="/admin.css">
+</head>
+<body>
+  <div class="topbar"><nav class="topbar-inner" aria-label="Main navigation">
+    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">b.</span><span>Bluqq<span class="brand-subtitle">VIRTUAL CAM</span></span></a>
+    <div class="nav-links"><a href="/">Camera studio</a><span class="nav-current" aria-current="page">Admin dashboard</span></div>
+    <button id="logout" class="button secondary lock-button" type="button" hidden>Lock dashboard</button>
+  </nav></div>
+  <main>
+    <header class="page-heading">
+      <div><p class="eyebrow">WORKSPACE / ADMINISTRATION</p><h1>Usage overview<span class="title-dot">.</span></h1><p class="intro">See which avatars were used, where, and for how long.</p></div>
+      <span class="access-badge"><span aria-hidden="true">◇</span> Administrator only</span>
+    </header>
+
+    <section id="loginPanel" class="login-panel">
+      <div class="login-copy"><span class="section-number" aria-hidden="true">01</span><h2>Your workspace, at a glance.</h2><p>Unlock session history with your administrator key. Personal access keys cannot open this dashboard.</p><div class="privacy-note">Usage details only. No meeting video or audio recordings.</div></div>
+      <form id="login">
+        <label for="adminKey">Administrator access key</label>
+        <input id="adminKey" type="password" autocomplete="off" spellcheck="false" required minlength="32" maxlength="256" placeholder="Enter your administrator key">
+        <button class="button primary" type="submit">Unlock dashboard <span aria-hidden="true">→</span></button>
+        <p class="field-help">Use the original admin key, not its SHA-256 hash or your Decart API key. It stays in this page's memory only.</p>
+      </form>
+    </section>
+
+    <div class="update-bar"><p id="message" role="status" aria-live="polite">Enter your administrator key to view usage.</p><button id="refresh" type="button" class="text-button" hidden>↻ Refresh activity</button></div>
+
+    <div id="dashboard" hidden>
+      <div class="metrics" aria-label="Usage summary">
+        <section class="metric"><p class="metric-label">Session attempts <span class="metric-symbol" aria-hidden="true">↗</span></p><strong id="count">—</strong><p class="metric-caption">Includes connections with no confirmed video.</p></section>
+        <section class="metric metric-featured"><p class="metric-label">Estimated video time <span class="metric-symbol" aria-hidden="true">◷</span></p><strong id="duration">—</strong><p class="metric-caption">Time measured between activity reports.</p></section>
+        <section class="metric"><p class="metric-label">Accounts used <span class="metric-symbol" aria-hidden="true">◎</span></p><strong id="users">—</strong><p class="metric-caption">Unique user IDs, not individual people.</p></section>
+      </div>
+      <p id="scope" class="summary-scope">Summary covers all matching records, across every page.</p>
+
+      <section class="filter-panel" aria-labelledby="filterTitle">
+        <div class="section-heading"><div><h2 id="filterTitle">Find activity</h2><p>Filter by account, meeting platform, or session request date.</p></div><button id="resetFilters" type="button" class="text-button">Clear filters</button></div>
+        <form id="filters">
+          <div class="filter-fields">
+            <label>Account ID<input id="owner" maxlength="64" placeholder="All accounts" spellcheck="false"></label>
+            <label>Platform<select id="platform"><option value="">All platforms</option><option value="website">Website preview</option><option value="meet">Google Meet</option><option value="zoom">Zoom Web</option><option value="teams">Microsoft Teams Web</option></select></label>
+            <label>From<input id="after" type="date"></label><label>Through<input id="before" type="date"></label>
+            <button class="button primary" type="submit">Apply filters</button>
+          </div>
+          <div class="filter-bottom"><div class="date-shortcuts" aria-label="Date shortcuts"><span>Quick dates</span><button id="rangeToday" type="button">Today</button><button id="rangeWeek" type="button">Last 7 days</button><button id="rangeAll" type="button">All time</button></div><p id="timeZone" class="field-help">Times use your local timezone.</p></div>
+        </form>
+      </section>
+
+      <section class="records" aria-labelledby="recordsTitle">
+        <div class="section-heading records-heading"><div><p class="eyebrow">ACTIVITY LOG</p><h2 id="recordsTitle">Session history <span id="recordCount" class="count-badge">0</span></h2><p>Most recent first. Open session details for request times and technical information.</p></div></div>
+        <div class="table-scroll"><table><caption class="sr-only">Virtual CAM usage sessions. All durations are estimates.</caption><thead><tr><th scope="col">Session</th><th scope="col">Account</th><th scope="col">Platform</th><th scope="col">Avatar</th><th scope="col">Video time</th><th scope="col">Status</th></tr></thead><tbody id="records"></tbody></table></div>
+        <div id="empty" class="empty-state" hidden><span class="empty-symbol" aria-hidden="true">◷</span><h3 id="emptyTitle">No activity yet</h3><p id="emptyDescription">Start a transformation on the website or in extension 0.3.12 or later, then refresh this page.</p></div>
+        <div class="pagination"><p id="page">0 sessions</p><div><button id="previous" class="button secondary" type="button">← Previous</button><button id="next" class="button secondary" type="button">Next →</button></div></div>
+      </section>
+
+      <details class="explanation"><summary><span>How to read this dashboard</span><span class="summary-hint">Durations &amp; statuses <span aria-hidden="true">＋</span></span></summary>
+        <div class="explanation-grid">
+          <div><h3>What counts as video time?</h3><p>Time is estimated from activity reports, usually about 20 seconds apart. Gaps longer than 45 seconds are excluded. “No measured time” means no timed interval was recorded—not proof that the camera was never used. These records are not billing or attendance evidence.</p></div>
+          <div><h3>What do statuses mean?</h3><p><strong>Activity reported:</strong> the client is sending recent reports. <strong>Finished:</strong> video activity was reported before the session ended. <strong>No video confirmed:</strong> the request had no confirmed activity. <strong>Reports stopped:</strong> updates are missing; a disconnect is not verified. <strong>Connection failed:</strong> the connection attempt failed.</p></div>
+          <div><h3>What is saved?</h3><p>Account ID, avatar details, platform, timestamps and approximate duration—not meeting recordings. Shared personal keys share an account ID. Only updated clients report usage, and older activity cannot be reconstructed.</p></div>
+        </div>
+      </details>
+    </div>
+    <footer><span>A product by <strong>Bluqq</strong></span><span>Private usage metadata · <a href="/privacy.html">Privacy &amp; data use ↗</a></span></footer>
+  </main>
+  <script src="/admin.js" defer></script>
+</body>
+</html>

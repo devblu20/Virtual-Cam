@@ -42,15 +42,25 @@ or IP address is stored in the usage tables. Infrastructure logs are separate.
    admin/personal hash. This helper does not edit `.env` or Railway for you.
 4. Apply Railway variable changes / redeploy. Existing `DECART_API_KEY` and
    `VCAM_ACCESS_KEYS` keep their existing roles. No new dependency is required.
-5. Open:
+5. Click **Admin dashboard** in the website header (opens a separate tab without
+   interrupting the camera), or open:
    `https://virtual-cam-production-9734.up.railway.app/admin.html`
    and enter the **raw administrator key**. The page keeps it in memory, clears
    the input after successful login, and clears credentials and rows on Lock or
    page exit. The static page can be opened by anyone, but records require the
    separately authenticated API. No admin credential is bundled in the page.
-6. Filter by user/platform/date; click Apply / refresh for fresh results. Times
+6. Filter by account/platform/date; click **Apply filters**, or use **Today**,
+   **Last 7 days** and **All time**. **Refresh activity** refreshes the applied filters.
+   **Lock dashboard** clears the administrator key and the displayed records. Times
    render in the viewing browser's local timezone. Dates filter **request time**.
    Totals apply to all matching sessions, not just the current 50-row page.
+
+The dashboard separates session attempts from estimated video time: an attempt
+without video reports is shown as **No video confirmed**, not a successful call.
+Zero-second rows show **No measured time**. Expand **Session details** for precise
+timestamps, client version and session ID, or avatar selections for per-avatar time.
+The dashboard redesign needs only a website/backend redeploy, with no new variables,
+database migration or extension ZIP update.
 
 ## Install the new reporting client once
 
