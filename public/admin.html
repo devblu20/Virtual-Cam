@@ -54,7 +54,7 @@
 
       <section class="records" aria-labelledby="recordsTitle">
         <div class="section-heading records-heading"><div><p class="eyebrow">ACTIVITY LOG</p><h2 id="recordsTitle">Session history <span id="recordCount" class="count-badge">0</span></h2><p>Most recent first. Open session details for request times and technical information.</p></div></div>
-        <div class="table-scroll"><table><caption class="sr-only">Virtual CAM usage sessions. All durations are estimates.</caption><thead><tr><th scope="col">Session</th><th scope="col">Account</th><th scope="col">Platform</th><th scope="col">Avatar</th><th scope="col">Video time</th><th scope="col">Status</th></tr></thead><tbody id="records"></tbody></table></div>
+        <div class="table-scroll"><table><caption class="sr-only">Virtual CAM usage sessions. All durations are estimates.</caption><thead><tr><th scope="col">Session</th><th scope="col">Name / account</th><th scope="col">Platform</th><th scope="col">Avatar</th><th scope="col">Video time</th><th scope="col">Status</th></tr></thead><tbody id="records"></tbody></table></div>
         <div id="empty" class="empty-state" hidden><span class="empty-symbol" aria-hidden="true">◷</span><h3 id="emptyTitle">No activity yet</h3><p id="emptyDescription">Start a transformation on the website or in extension 0.3.12 or later, then refresh this page.</p></div>
         <div class="pagination"><p id="page">0 sessions</p><div><button id="previous" class="button secondary" type="button">← Previous</button><button id="next" class="button secondary" type="button">Next →</button></div></div>
       </section>
@@ -63,7 +63,7 @@
         <div class="explanation-grid">
           <div><h3>What counts as video time?</h3><p>Time is estimated from activity reports, usually about 20 seconds apart. Gaps longer than 45 seconds are excluded. “No measured time” means no timed interval was recorded—not proof that the camera was never used. These records are not billing or attendance evidence.</p></div>
           <div><h3>What do statuses mean?</h3><p><strong>Activity reported:</strong> the client is sending recent reports. <strong>Finished:</strong> video activity was reported before the session ended. <strong>No video confirmed:</strong> the request had no confirmed activity. <strong>Reports stopped:</strong> updates are missing; a disconnect is not verified. <strong>Connection failed:</strong> the connection attempt failed.</p></div>
-          <div><h3>What is saved?</h3><p>Account ID, avatar details, platform, timestamps and approximate duration—not meeting recordings. Shared personal keys share an account ID. Only updated clients report usage, and older activity cannot be reconstructed.</p></div>
+          <div><h3>What is saved?</h3><p>Entered name (when provided), account ID, avatar details, platform, timestamps and approximate duration—not meeting recordings. Names are self-reported, not verified, and cannot prove who used a shared device. Shared personal keys share an account ID. Only updated clients report usage, and older activity cannot be reconstructed.</p></div>
         </div>
       </details>
     </div>

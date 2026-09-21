@@ -61,6 +61,41 @@ class UsageTests(unittest.TestCase):
             self.assertIn(self.client.get("/api/admin/usage", headers=headers).status_code, [401, 403])
         self.assertEqual(self.history()["total"], 0)
 
+    def test_name_is_trimmed_snapshotted_and_never_changes_ownership(self):
+        first = self.start(metadata={**META, "participantName": "  देव शर्मा  ", "owner": "bob"})
+        self.start(2000, {**META, "participantName": "Asha"})
+        rows = self.history(2001)["items"]
+        self.assertEqual([r["participant_name"] for r in rows], ["Asha", "देव शर्मा"])
+        self.assertEqual({r["owner"] for r in rows}, {"alice"})
+        self.event(first, "end", 1, 2010, participantName="Someone else")
+        self.assertEqual(self.history(2011)["items"][1]["participant_name"], "देव शर्मा")
+
+    def test_name_validation_and_old_client_compatibility(self):
+        for value in ["", "   ", 12, None, "a" * 81, "Name\n", "Name\x00", "Name\u202e"]:
+            response = self.client.post("/api/realtime-token", headers=AUTH, json={"usage": {**META, "participantName": value}})
+            self.assertEqual(response.status_code, 400, repr(value))
+        self.start()
+        self.assertIsNone(self.history()["items"][0]["participant_name"])
+        self.assertEqual(usage_metadata({"usage": {**META, "participantName": "Jose\u0301"}})["participant_name"], "José")
+
+    def test_legacy_database_migration_preserves_rows_and_is_repeatable(self):
+        identifier = self.start()
+        self.event(identifier, "pulse", 1, 1010)
+        self.event(identifier, "end", 2, 1030)
+        with UsageStore().connection() as db:
+            db.execute("ALTER TABLE usage_sessions DROP COLUMN participant_name")
+        before = self.history()["items"][0]
+        self.assertEqual(before["id"], identifier)
+        self.assertIsNone(before["participant_name"])
+        self.assertEqual(before["seconds"], 20)
+        self.assertEqual(len(before["avatars"]), 1)
+        self.start(2000, {**META, "participantName": "New user"})
+        with TestClient(server.create_app()) as fresh:
+            records = fresh.get("/api/admin/usage", headers=ADMIN_AUTH).json()["items"]
+        self.assertEqual(len(records), 2)
+        self.assertEqual(records[0]["participant_name"], "New user")
+        self.assertEqual(records[1]["id"], identifier)
+
     def test_admin_must_not_share_personal_key(self):
         for value in ["", "bad", hashlib.sha256(KEY.encode()).hexdigest()]:
             with patch.dict(os.environ, {"VCAM_ADMIN_KEY_SHA256": value}), TestClient(server.create_app()) as client:

@@ -65,7 +65,10 @@
       const entry = node("p"); entry.append(node("strong", "", label), node("span", "", value)); details.append(entry);
     }
     requested.append(details);
-    cell(row, "Account").append(node("span", "account-label", item.owner));
+    const person = cell(row, "Name / account");
+    person.append(node("span", "cell-title", item.participant_name || "Name not provided"));
+    small(person, item.participant_name ? "Self-reported · not verified" : "Older client or website session");
+    person.append(node("span", "account-label", item.owner));
     cell(row, "Platform").append(node("span", "cell-title", platformNames[item.platform] || "Unknown platform"));
     const avatars = cell(row, "Avatar");
     const avatarList = item.avatars || [];

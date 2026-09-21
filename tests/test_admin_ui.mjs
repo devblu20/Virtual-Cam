@@ -32,6 +32,17 @@ test('admin keeps key out of URLs, renders untrusted names as text, clears key/r
 });
 
 const allText=element=>[element.textContent,...element.children.map(allText)].join(' ');
+
+test('self-reported names render as text while older sessions stay unnamed',async()=>{
+  const items=[{...data.items[0],participant_name:'<img src=x onerror=alert(1)>'},data.items[0]];
+  const h=harness(async()=>({ok:true,json:async()=>({...data,items,total:2})}));
+  h.el('login').fire('submit');await flush();
+  const rows=h.el('records').children;
+  assert.equal(rows[0].children[1].children[0].textContent,'<img src=x onerror=alert(1)>');
+  assert.match(allText(rows[0]),/Self-reported · not verified/);
+  assert.match(allText(rows[0]),/alice/);
+  assert.match(allText(rows[1]),/Name not provided/);
+});
 test('statuses distinguish successful activity, zero-time attempts and interrupted reporting',async()=>{
   const items=[
     {...data.items[0],state:'ended',started:null,seconds:0,reason:'closed'},

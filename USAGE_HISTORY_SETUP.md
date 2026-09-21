@@ -2,6 +2,17 @@
 
 ## What is recorded
 
+Extension 0.3.13 adds an entered name to each new session. It is self-reported,
+not a verified identity, and does not change access-key ownership. The administrator
+sees Name / account. Missing names (older clients and website sessions) are labeled
+Name not provided. Names are snapshotted at session creation; later edits cannot
+rename past history. The Accounts used metric still counts access-key IDs.
+
+Deploy this backend before using extension 0.3.13. Back up the SQLite database
+first. The nullable participant_name column is added automatically to the existing
+database, preserving old rows. No new Railway variable is needed. Review the updated
+privacy notices and store data declarations before distributing the new extension.
+
 New instrumented sessions record the configured user ID, avatar ID/name, source
 (website/extension), platform (website/Meet/Zoom Web/Teams Web), client version,
 server request/start/end times, status and estimated activity seconds. Website

@@ -12,6 +12,7 @@ import os
 import re
 import time
 import uuid
+import unicodedata
 from collections import defaultdict, deque
 
 from fastapi import HTTPException, Request
@@ -82,7 +83,13 @@ def usage_metadata(body):
         raise HTTPException(400, "Invalid usage source.")
     if value.get("platform") not in PLATFORMS or (value["source"] == "website") != (value["platform"] == "website"):
         raise HTTPException(400, "Invalid usage platform.")
-    return {"source": value["source"], "platform": value["platform"],
+    participant_name = None
+    if "participantName" in value:
+        raw_name = value["participantName"]
+        if not isinstance(raw_name, str) or any(unicodedata.category(c).startswith("C") for c in raw_name):
+            raise HTTPException(400, "Enter a valid name (1–80 characters).")
+        participant_name = clean_text(unicodedata.normalize("NFC", raw_name), 80)
+    return {"source": value["source"], "platform": value["platform"], "participant_name": participant_name,
             "version": clean_text(value.get("version", "unknown"), 32),
             "avatar": avatar_metadata(value.get("avatar"))}
 
@@ -95,7 +102,7 @@ class UsageStore(ReferenceStore):
           platform TEXT NOT NULL, client_version TEXT NOT NULL, created REAL NOT NULL,
           started REAL, last_seen REAL NOT NULL, ended REAL, state TEXT NOT NULL,
           reason TEXT, sequence INTEGER NOT NULL DEFAULT 0, seconds REAL NOT NULL DEFAULT 0,
-          has_gaps INTEGER NOT NULL DEFAULT 0);
+          has_gaps INTEGER NOT NULL DEFAULT 0, participant_name TEXT);
         CREATE INDEX IF NOT EXISTS usage_created ON usage_sessions(created DESC);
         CREATE INDEX IF NOT EXISTS usage_owner ON usage_sessions(owner, created DESC);
         CREATE TABLE IF NOT EXISTS usage_avatars (
@@ -103,6 +110,13 @@ class UsageStore(ReferenceStore):
           avatar_id TEXT NOT NULL, name TEXT NOT NULL, selected REAL NOT NULL,
           seconds REAL NOT NULL DEFAULT 0, PRIMARY KEY(session_id, ordinal));
         """)
+        # Additive migration: preserve all existing sessions and their ownership.
+        # Recheck under the write lock so simultaneous first requests are safe.
+        if "participant_name" not in {row[1] for row in db.execute("PRAGMA table_info(usage_sessions)")}:
+            db.execute("BEGIN IMMEDIATE")
+            if "participant_name" not in {row[1] for row in db.execute("PRAGMA table_info(usage_sessions)")}:
+                db.execute("ALTER TABLE usage_sessions ADD COLUMN participant_name TEXT")
+            db.commit()
 
     def resolve_avatar(self, db, owner, avatar):
         if avatar["kind"] == "library":
@@ -126,8 +140,8 @@ class UsageStore(ReferenceStore):
             if db.execute("SELECT COUNT(*) FROM usage_sessions").fetchone()[0] >= MAX_SESSIONS:
                 raise HTTPException(503, "Usage history capacity reached.")
             avatar = self.resolve_avatar(db, owner, metadata["avatar"])
-            db.execute("INSERT INTO usage_sessions(id,owner,source,platform,client_version,created,last_seen,state) VALUES(?,?,?,?,?,?,?,?)",
-                       (identifier, owner, metadata["source"], metadata["platform"], metadata["version"], now, now, "connecting"))
+            db.execute("INSERT INTO usage_sessions(id,owner,source,platform,client_version,created,last_seen,state,participant_name) VALUES(?,?,?,?,?,?,?,?,?)",
+                       (identifier, owner, metadata["source"], metadata["platform"], metadata["version"], now, now, "connecting", metadata.get("participant_name")))
             db.execute("INSERT INTO usage_avatars(session_id,ordinal,kind,avatar_id,name,selected) VALUES(?,0,?,?,?,?)", (identifier, *avatar, now))
         return identifier
 
