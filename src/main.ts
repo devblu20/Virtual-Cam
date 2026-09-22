@@ -55,6 +55,9 @@ let preparedReference: File | null = null;
 let appliedReference: File | null = null;
 let referenceUrl: string | null = null;
 let usage: UsageReporter | null = null;
+// Memory-only, retained through stop() so a failed connection's token can be
+// redacted from its error. Replaced on the next token request; never logged.
+let diagnosticToken = "";
 
 function model() {
   return models.realtime(EXTENSION_MODEL);
@@ -136,8 +139,33 @@ function status(text: string, tone = "idle") {
   el<HTMLElement>("statusText").textContent = text;
   el<HTMLElement>("status").dataset.tone = tone;
 }
+function errorText(error: unknown, fallback = "The operation failed without an error message. Stop and reconnect; contact Bluqq support if it continues."): string {
+  // SDK errors are plain objects, not necessarily Error instances. Read only
+  // public message fields, never dump data, cause, stack or request headers.
+  function describe(value: unknown, depth = 0): string {
+    if (depth > 3) return "";
+    if (typeof value === "string") return value.trim() === "[object Object]" ? "" : value.trim();
+    if (!value || typeof value !== "object") return "";
+    if (Array.isArray(value)) return value.slice(0, 3).map(item => describe(item, depth + 1)).filter(Boolean).join("; ");
+    const item = value as Record<string, unknown>;
+    const code = typeof item.code === "string" && /^[A-Z0-9_.-]{1,64}$/.test(item.code) ? item.code : "";
+    const message = [item.message, item.detail, item.msg, item.error]
+      .map(part => describe(part, depth + 1)).find(Boolean) || "";
+    return code ? `[${code}] ${message || fallback}` : message;
+  }
+  let text = describe(error) || fallback;
+  for (const secret of [accessKey.value.trim(), diagnosticToken]) {
+    if (secret) text = text.split(secret).join("[redacted]");
+  }
+  // Signaling URLs can contain ephemeral tokens. Keep neither URLs nor
+  // credential-shaped fields in the user-visible diagnostic.
+  text = text.replace(/\b(?:https?|wss?):\/\/[^\s<>"']+/gi, "[URL redacted]")
+    .replace(/\bBearer\s+[^\s,;"']+/gi, "Bearer [redacted]")
+    .replace(/\b(api[_-]?key|access[_-]?key|token|authorization)\s*[=:]\s*[^\s,;]+/gi, "$1=[redacted]");
+  return text.length > 1200 ? text.slice(0, 1199) + "…" : text;
+}
 function showError(error: unknown) {
-  notice.textContent = error instanceof Error ? error.message : String(error);
+  notice.textContent = errorText(error);
   notice.dataset.tone = "error";
   notice.hidden = false;
 }
@@ -236,6 +264,7 @@ async function startCamera() {
   }
 }
 async function fetchToken(signal: AbortSignal, reporter: UsageReporter, reference: File): Promise<{ apiKey: string; config: ProcessingConfig }> {
+  diagnosticToken = "";
   const avatar = await referenceMetadata(reference);
   signal.throwIfAborted();
   const response = await fetch("/api/realtime-token", {
@@ -246,9 +275,13 @@ async function fetchToken(signal: AbortSignal, reporter: UsageReporter, referenc
     signal,
   });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok || typeof payload.apiKey !== "string") {
-    throw new Error(payload.detail || "Could not create a connection token.");
+  if (!response.ok || typeof payload?.apiKey !== "string") {
+    throw {
+      code: Number.isInteger(response.status) ? `HTTP_${response.status}` : "TOKEN_REQUEST_FAILED",
+      message: errorText(payload, "Could not create a connection token."),
+    };
   }
+  diagnosticToken = payload.apiKey;
   reporter.attach(payload.usageSessionId);
   return { apiKey: payload.apiKey, config: processingConfig(payload.processingConfig) };
 }

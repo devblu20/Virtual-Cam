@@ -158,6 +158,74 @@ test("reference application logs avatar only on success and reporting failures d
   } finally { h.cleanup(); }
 });
 
+test("SDK object errors show the provider code and message, not object coercion", async () => {
+  const h = harness();
+  try {
+    h.hooks.connect = async () => { throw { code: "WEBRTC_SERVER_ERROR", message: "Provider rejected the session." }; };
+    await h.click("cameraButton"); await h.click("connectButton");
+    assert.equal(h.el("notice").textContent, "[WEBRTC_SERVER_ERROR] Provider rejected the session.");
+    assert.equal(h.el("statusText").textContent, "Connection failed");
+    assert.equal(h.raw.track.stopped, true);
+  } finally { h.cleanup(); }
+});
+
+test("SDK runtime errors and reference-update errors use the same readable formatter", async () => {
+  const h = harness();
+  try {
+    let fail;
+    h.connection.on = (name, callback) => { if (name === "error") fail = callback; };
+    await h.click("cameraButton"); await h.click("connectButton");
+    h.connection.set = async () => { throw { code: "INVALID_INPUT", message: "Reference rejected." }; };
+    await h.click("updateButton");
+    assert.equal(h.el("notice").textContent, "[INVALID_INPUT] Reference rejected.");
+    fail({ code: "WEBRTC_ICE_ERROR", message: "ICE connection failed" });
+    assert.equal(h.el("notice").textContent, "[WEBRTC_ICE_ERROR] ICE connection failed");
+    assert.equal(h.remote.track.stopped, true);
+  } finally { h.cleanup(); }
+});
+
+test("backend structured errors retain HTTP status and validation messages", async () => {
+  const h = harness();
+  try {
+    h.hooks.fetch = async () => ({ ok: false, status: 422, json: async () => ({ detail: [{ msg: "Unsupported configuration." }] }) });
+    await h.click("cameraButton"); await h.click("connectButton");
+    assert.equal(h.el("notice").textContent, "[HTTP_422] Unsupported configuration.");
+    assert.equal(h.calls.decart.length, 0);
+  } finally { h.cleanup(); }
+});
+
+test("error display redacts credentials and URLs without dumping error data or causes", async () => {
+  const h = harness();
+  try {
+    h.hooks.connect = async () => { throw {
+      code: "WEBRTC_SERVER_ERROR",
+      message: `Failed ${h.el("accessKey").value} short-lived-test-token wss://example.test/secret?api_key=hidden Bearer another-secret`,
+      data: { apiKey: "must-not-display" }, cause: { message: "private-cause" },
+    }; };
+    await h.click("cameraButton"); await h.click("connectButton");
+    const text = h.el("notice").textContent;
+    assert.match(text, /WEBRTC_SERVER_ERROR/);
+    assert.doesNotMatch(text, /fake-test-access|short-lived-test-token|example\.test|hidden|another-secret|must-not-display|private-cause/);
+    assert.match(text, /redacted/);
+  } finally { h.cleanup(); }
+});
+
+test("malformed, cyclic and HTML-looking errors stay bounded plain text", async () => {
+  const cyclic = {}; cyclic.detail = cyclic;
+  for (const failure of [cyclic, null, { data: { private: "secret" } }, { message: "<img onerror=alert(1)>" }, { message: "x".repeat(10000) }]) {
+    const h = harness();
+    try {
+      h.hooks.connect = async () => { throw failure; };
+      await h.click("cameraButton"); await h.click("connectButton");
+      const text = h.el("notice").textContent;
+      assert.ok(text.length > 0 && text.length <= 1200);
+      assert.doesNotMatch(text, /\[object Object\]|private|secret/);
+      assert.equal(h.el("notice").innerHTML, undefined);
+      if (failure?.message?.startsWith("<img")) assert.equal(text, failure.message);
+    } finally { h.cleanup(); }
+  }
+});
+
 test("website uses Bluqq branding without editable prompt controls", () => {
   const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
   assert.match(html, /A product by <strong>Bluqq<\/strong>/);
