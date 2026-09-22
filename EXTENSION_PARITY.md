@@ -1,5 +1,13 @@
 # Website / Bluqq extension video-profile alignment
 
+## Current prompt delivery (extension 0.3.16+)
+
+The website and updated extension now read the same prompt from Railway's `transformation_prompt.txt` through each authenticated token response. The existing wording has been preserved. Active sessions pin their received prompt, including reference changes; a new connection fetches the latest server version. The historical bundled-prompt notes below describe the earlier implementation, not the current source of instructions. See `RAILWAY_PROMPT_SETUP.md`.
+
+Current tests validate server-provided prompt delivery and the unchanged video settings. The old fixture is retained as a historical record, not a second editable prompt source.
+
+## Historical alignment notes
+
 Updated 2026-09-15 against the supplied `Bluqq-Virtual-CAM-0.3.2.zip`, whose manifest identifies version **0.3.8**. This is video-request alignment, not a port of every meeting-extension feature.
 
 ## Aligned settings

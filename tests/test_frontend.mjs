@@ -13,6 +13,7 @@ const source = usageSource + "\n" + readFileSync(new URL("../src/main.ts", impor
   .replace('import { UsageReporter, referenceMetadata } from "./usage";', "");
 const compiled = (await transformWithOxc(source, "main.ts")).code.replace(/export\s*\{\s*\};?/g, "");
 const extensionProfile = JSON.parse(readFileSync(new URL("./fixtures/bluqq-0.3.8-video-profile.json", import.meta.url), "utf8"));
+const processingConfig = { schemaVersion: 1, prompt: 'Test prompt supplied only by Railway', revision: 'a'.repeat(64) };
 
 function media() {
   const track = { stopped: false, settings: { width: 1280, height: 720, frameRate: 30 }, listeners: {}, stop() { this.stopped = true; },
@@ -59,7 +60,7 @@ function harness() {
     now: 0,
     camera: async () => raw,
     decode: async file => { file.arrayBuffer ??= async () => new ArrayBuffer(8); return { width: file.width ?? 1024, height: file.height ?? 1280, close() { calls.bitmapClosed++; } }; },
-    fetch: async () => ({ ok: true, json: async () => ({ apiKey: "short-lived-test-token" }) }),
+    fetch: async () => ({ ok: true, json: async () => ({ apiKey: "short-lived-test-token", processingConfig }) }),
     connect: async (_stream, options) => { options.onRemoteStream(remote); return connection; },
   };
   const sdk = {
@@ -122,7 +123,7 @@ test("usage tracks decoded frames, throttles heartbeats, and sends a final stop"
   const h = harness();
   try {
     h.hooks.fetch = async url => ({ ok: true, json: async () => url === "/api/realtime-token"
-      ? { apiKey: "token", usageSessionId: "12345678-1234-4123-8123-123456789abc" } : { ok: true } });
+      ? { apiKey: "token", processingConfig, usageSessionId: "12345678-1234-4123-8123-123456789abc" } : { ok: true } });
     await h.click("cameraButton"); await h.click("connectButton");
     assert.equal(h.calls.fetch.length, 1); // Connected socket alone is not video activity.
     h.el("outputVideo").frame(); await flush();
@@ -143,7 +144,7 @@ test("usage tracks decoded frames, throttles heartbeats, and sends a final stop"
 test("reference application logs avatar only on success and reporting failures do not stop video", async () => {
   const h = harness();
   try {
-    h.hooks.fetch = async url => ({ ok: url === "/api/realtime-token", json: async () => ({ apiKey: "token", usageSessionId: "12345678-1234-4123-8123-123456789abc" }) });
+    h.hooks.fetch = async url => ({ ok: url === "/api/realtime-token", json: async () => ({ apiKey: "token", processingConfig, usageSessionId: "12345678-1234-4123-8123-123456789abc" }) });
     await h.click("cameraButton"); await h.click("connectButton");
     h.el("outputVideo").frame(); await flush();
     assert.match(h.el("usageNotice").textContent, /interrupted/);
@@ -161,28 +162,21 @@ test("website uses Bluqq branding without editable prompt controls", () => {
   const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
   assert.match(html, /A product by <strong>Bluqq<\/strong>/);
   assert.doesNotMatch(html, /id="(?:promptInput|enhanceInput)"/);
-  assert.match(html, /agree to send my camera video, reference image, and the built-in prompt/);
+  assert.match(html, /agree to send my camera video, reference image, and Bluqq's server-provided prompt/);
   assert.match(html, /AI-generated video/);
   assert.match(html, /Bluqq extension 0\.3\.8 · Lucy 2\.1/);
   assert.doesNotMatch(html, /id="(?:modelSelect|resolutionSelect)"/);
   assert.match(html, /upload the same portrait/);
 });
 
-test("built-in prompt and enhancement apply to both connection and reference updates", async () => {
+test("server prompt is pinned for connection and reference updates without enhancement", async () => {
   const h = harness();
   try {
     await h.click("cameraButton");
     await h.click("connectButton");
     const initial = h.calls.decart[0][1].initialState.prompt;
-    assert.equal(initial.text, extensionProfile.prompt);
-    assert.match(initial.text, /^Replace the live person/);
-    assert.match(initial.text, /consented reference person/);
-    assert.match(initial.text, /beard and moustache/);
-    assert.match(initial.text, /hairline, hairstyle, hair color/);
-    assert.match(initial.text, /neck length and thickness/);
-    assert.match(initial.text, /upper-body build/);
-    assert.match(initial.text, /precise lip closures/);
-    assert.equal(initial.text.length, 792); // Exact ZIP parity, not provider acceptance proof.
+    assert.equal(initial.text, processingConfig.prompt);
+    assert.equal(JSON.parse(h.calls.fetch[0][1].body).processingConfigVersion, 1);
     assert.equal(initial.enhance, false);
     assert.equal(h.calls.decart[0][1].initialState.image, h.el("referenceInput").files[0]);
     assert.match(h.el("referenceState").textContent, /Reference applied/);
@@ -191,6 +185,31 @@ test("built-in prompt and enhancement apply to both connection and reference upd
     assert.equal(h.calls.updates[0].prompt, initial.text);
     assert.equal(h.calls.updates[0].enhance, false);
     assert.equal(h.calls.updates[0].image, h.el("referenceInput").files[0]);
+  } finally { h.cleanup(); }
+});
+
+test("missing Railway prompt cannot fall back to a bundled instruction", async () => {
+  for (const config of [undefined, { ...processingConfig, schemaVersion: 2 }, { ...processingConfig, prompt: '' }]) {
+    const h = harness();
+    try {
+      h.hooks.fetch = async () => ({ ok: true, json: async () => ({ apiKey: 'test', processingConfig: config }) });
+      await h.click('cameraButton'); await h.click('connectButton');
+      assert.equal(h.calls.decart.length, 0);
+      assert.match(h.el('notice').textContent, /valid processing prompt/);
+    } finally { h.cleanup(); }
+  }
+});
+
+test("next connection fetches changed prompt while reference updates keep session prompt", async () => {
+  const h = harness();
+  try {
+    await h.click('cameraButton'); await h.click('connectButton');
+    const changed = { ...processingConfig, prompt: 'A newly approved Railway prompt', revision: 'b'.repeat(64) };
+    h.hooks.fetch = async () => ({ ok: true, json: async () => ({ apiKey: 'test', processingConfig: changed }) });
+    await h.click('updateButton');
+    assert.equal(h.calls.updates.at(-1).prompt, processingConfig.prompt);
+    await h.click('stopButton'); await h.click('cameraButton'); await h.click('connectButton');
+    assert.equal(h.calls.decart.at(-1)[1].initialState.prompt.text, changed.prompt);
   } finally { h.cleanup(); }
 });
 

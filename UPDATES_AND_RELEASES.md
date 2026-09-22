@@ -9,11 +9,11 @@ The website and the extension are separate applications. They share the authenti
 | Backend access records, quotas or storage implementation | Update Railway/configuration, keeping the API compatible | No |
 | Extension popup layout, links or buttons | Build and publish a new extension version | Yes |
 | Extension camera hooks, meeting support, bundled SDK or permissions | Build, test and publish a new extension version | Yes |
-| The extension's currently bundled transformation prompt | Update `presets.js` and publish a new extension version | Yes |
+| Transformation prompt for extension 0.3.16+ | Edit `transformation_prompt.txt`, push and deploy Railway; reconnect | No |
 
 The popup loads saved photos when opened with a session key, or after a valid-length key is entered. It polls every 20 seconds while open and visible. A Refresh button is also available. New photos do not alter the active meeting or silently choose a face. The user selects a reference before starting.
 
-Changing the website's own camera prompt or processing logic does **not** automatically change the extension's corresponding code. Keep that distinction when testing parity. Compatible server changes can be shipped independently; breaking endpoint changes or new browser capabilities may need a coordinated extension update.
+The website and extension 0.3.16+ share the server-managed prompt: edit `transformation_prompt.txt`, deploy Railway, then stop and reconnect to use it. Older extensions retain their bundled prompt until upgraded once. Other website processing-code changes do not automatically update extension code. Compatible server changes can ship independently; breaking endpoint changes or new browser capabilities may need a coordinated extension update.
 
 There is no compliant promise that every future code change can bypass extension releases. Chrome Manifest V3 requires extension logic to be bundled. Remote images and data are allowed, but downloading and executing updated JavaScript/WASM from Railway is not a substitute for store review. See [Chrome's Manifest V3 requirements](https://developer.chrome.com/docs/webstore/program-policies/mv3-requirements).
 

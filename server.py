@@ -21,6 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from reference_library import register_reference_routes
 from usage_history import register_usage_routes, small_json, usage_metadata
 from starlette.concurrency import run_in_threadpool
+from processing_config import load_processing_config
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
@@ -99,7 +100,13 @@ def create_app() -> FastAPI:
         if user is None:
             raise HTTPException(401, "Access key is invalid or revoked.")
 
-        usage = usage_metadata(await small_json(request))
+        body = await small_json(request)
+        usage = usage_metadata(body)
+        configuration = None
+        if isinstance(body, dict) and "processingConfigVersion" in body:
+            if type(body["processingConfigVersion"]) is not int or body["processingConfigVersion"] != 1:
+                raise HTTPException(400, "Unsupported processing configuration version.")
+            configuration = await run_in_threadpool(load_processing_config)
 
         async with quota_lock:
             now = time.monotonic()
@@ -124,6 +131,8 @@ def create_app() -> FastAPI:
                         metadata={"app": "virtualcam-cloud"},
                     )
             result = {"apiKey": token.api_key}
+            if configuration is not None:
+                result["processingConfig"] = configuration
             if usage:
                 result.update(usageSessionId=usage_id, usageRecorded=bool(usage_id))
             return result

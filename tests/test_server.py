@@ -2,11 +2,14 @@ import hashlib
 import json
 import os
 import unittest
+import tempfile
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 import server
+import processing_config
 
 TEST_KEY = "test-only-not-a-real-credential-1234567890"
 TEST_KEY_2 = "test-only-second-credential-123456789012"
@@ -60,6 +63,50 @@ class CloudTests(unittest.TestCase):
             expires_in=120, allowed_models=["lucy-2.1", "lucy-2.5"],
             metadata={"app": "virtualcam-cloud"},
         )
+
+    def test_processing_prompt_is_authenticated_and_refreshed_per_connection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "prompt.txt"
+            with patch.object(processing_config, "PROMPT_PATH", path):
+                path.write_text("Unchanged test prompt A", encoding="utf-8")
+                payload = {"processingConfigVersion": 1, "prompt": "Untrusted client override"}
+                denied = self.client.post("/api/realtime-token", json=payload)
+                self.assertEqual(denied.status_code, 401)
+                self.sdk.assert_not_called()
+                first = self.client.post("/api/realtime-token", headers=AUTH, json=payload)
+                self.assertEqual(first.status_code, 200)
+                config = first.json()["processingConfig"]
+                self.assertEqual(config["prompt"], "Unchanged test prompt A")
+                self.assertEqual(config["schemaVersion"], 1)
+                self.assertEqual(first.headers["cache-control"], "no-store")
+                path.write_text("Updated test prompt B", encoding="utf-8")
+                second = self.client.post("/api/realtime-token", headers=AUTH, json=payload).json()["processingConfig"]
+                self.assertEqual(second["prompt"], "Updated test prompt B")
+                self.assertNotEqual(config["revision"], second["revision"])
+
+    def test_bad_processing_config_never_mints_a_paid_token(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "prompt.txt"
+            with patch.object(processing_config, "PROMPT_PATH", path):
+                for content in [None, b"   ", b"x" * 4001, b"\xff", b"x" * 16001]:
+                    if content is not None:
+                        path.write_bytes(content)
+                    result = self.client.post("/api/realtime-token", headers=AUTH, json={"processingConfigVersion": 1})
+                    self.assertEqual(result.status_code, 503)
+                self.sdk.assert_not_called()
+                # Old extensions keep their token contract without remote configuration.
+                self.assertEqual(self.client.post("/api/realtime-token", headers=AUTH).status_code, 200)
+
+    def test_unsupported_processing_config_version_is_rejected(self):
+        for version in [0, 2, True, "1", None]:
+            response = self.client.post("/api/realtime-token", headers=AUTH, json={"processingConfigVersion": version})
+            self.assertEqual(response.status_code, 400)
+        self.sdk.assert_not_called()
+
+    def test_config_revision_matches_the_single_prompt_file(self):
+        config = processing_config.load_processing_config()
+        self.assertEqual(config["revision"], hashlib.sha256(config["prompt"].encode("utf-8")).hexdigest())
+        self.assertEqual(config["prompt"], processing_config.PROMPT_PATH.read_text(encoding="utf-8").strip())
 
     def test_user_rate_limit_and_isolation(self):
         for _ in range(5):

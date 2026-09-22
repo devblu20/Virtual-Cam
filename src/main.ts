@@ -4,10 +4,19 @@ import { UsageReporter, referenceMetadata } from "./usage";
 
 // Video profile from the supplied Bluqq ZIP (manifest version 0.3.8).
 // Keep initial connections and reference updates aligned. See EXTENSION_PARITY.md.
-// This is frontend code, not a secret; the compiled prompt remains inspectable.
-// This exact 792-character ZIP prompt needs live provider validation; do not
-// silently shorten it on one client or retry paid sessions with a different prompt.
-const TRANSFORMATION_PROMPT = "Replace the live person with the consented reference person. Match facial identity, face shape, skin tone, hairline, hairstyle, hair color, beard and moustache shape, density and color. Match the reference's neck length and thickness, shoulder width and slope, chest width, torso shape and upper-body build. Keep the head, neck, shoulders and chest naturally connected, with consistent reference proportions as the person moves; avoid stretching, narrowing or abrupt changes. Match clothing, neckline, colors and fabric details. Use live video for pose, gestures, blinking, precise lip closures, jaw motion and speaking rhythm, preserving reference appearance. Do not invent or exaggerate mouth or tongue movements. Maintain natural skin and hair texture and the live background and lighting.";
+// The only editable prompt lives in transformation_prompt.txt on Railway.
+// Every new connection receives a validated, session-pinned text configuration.
+type ProcessingConfig = { schemaVersion: 1; prompt: string; revision: string };
+let sessionPrompt: string | null = null;
+function processingConfig(value: unknown): ProcessingConfig {
+  const config = value as Partial<ProcessingConfig> | null;
+  if (!config || config.schemaVersion !== 1 || typeof config.prompt !== "string" ||
+      !config.prompt.trim() || config.prompt.length > 4000 ||
+      typeof config.revision !== "string" || !/^[a-f0-9]{64}$/.test(config.revision)) {
+    throw new Error("Railway did not provide a valid processing prompt. Deploy the updated backend, then reconnect.");
+  }
+  return { schemaVersion: 1, prompt: config.prompt, revision: config.revision };
+}
 const EXTENSION_MODEL = "lucy-2.1";
 const CAMERA_FPS = 25;
 // Keep the explicit identity/clothing instructions intact instead of rewriting them.
@@ -149,6 +158,7 @@ function syncControls() {
 function clearRemote() {
   const previous = connection;
   connection = null;
+  sessionPrompt = null;
   try { previous?.disconnect(); } catch { /* Already disconnected. */ }
   remote?.getTracks().forEach(track => track.stop());
   remote = null;
@@ -225,13 +235,14 @@ async function startCamera() {
     if (ownVersion === version) { busy = false; syncControls(); }
   }
 }
-async function fetchToken(signal: AbortSignal, reporter: UsageReporter, reference: File): Promise<string> {
+async function fetchToken(signal: AbortSignal, reporter: UsageReporter, reference: File): Promise<{ apiKey: string; config: ProcessingConfig }> {
   const avatar = await referenceMetadata(reference);
   signal.throwIfAborted();
   const response = await fetch("/api/realtime-token", {
     method: "POST",
     headers: { Authorization: "Bearer " + accessKey.value.trim(), "Content-Type": "application/json" },
-    body: JSON.stringify({ usage: { source: "website", platform: "website", version: "usage-v1", avatar } }),
+    body: JSON.stringify({ processingConfigVersion: 1, usage: { source: "website", platform: "website", version: "usage-v2", avatar } }),
+    cache: "no-store", credentials: "omit", redirect: "error",
     signal,
   });
   const payload = await response.json().catch(() => ({}));
@@ -239,7 +250,7 @@ async function fetchToken(signal: AbortSignal, reporter: UsageReporter, referenc
     throw new Error(payload.detail || "Could not create a connection token.");
   }
   reporter.attach(payload.usageSessionId);
-  return payload.apiKey;
+  return { apiKey: payload.apiKey, config: processingConfig(payload.processingConfig) };
 }
 async function connect() {
   if (busy || connection || !camera) return;
@@ -273,7 +284,7 @@ async function connect() {
     const token = await fetchToken(abort.signal, reporter, reference);
     if (ownVersion !== version) return;
     const client = createDecartClient({
-      apiKey: token,
+      apiKey: token.apiKey,
       telemetry: false,
       logger: { debug() {}, info() {}, warn() {}, error() {} },
       integration: "bluqq-website",
@@ -282,7 +293,7 @@ async function connect() {
       model: model(),
       mirror: false,
       // No resolution override: use the same provider default as the ZIP.
-      initialState: { prompt: { text: TRANSFORMATION_PROMPT, enhance: ENHANCE_PROMPT }, image: reference },
+      initialState: { prompt: { text: token.config.prompt, enhance: ENHANCE_PROMPT }, image: reference },
       onRemoteStream: (stream: MediaStream) => {
         if (ownVersion !== version) { stream.getTracks().forEach(track => track.stop()); return; }
         if (remote && remote !== stream) remote.getTracks().forEach(track => track.stop());
@@ -319,6 +330,7 @@ async function connect() {
     });
     if (ownVersion !== version) { connected.disconnect(); return; }
     connection = connected;
+    sessionPrompt = token.config.prompt;
     appliedReference = reference;
     connected.on("error", (error) => {
       if (ownVersion !== version) return;
@@ -347,7 +359,8 @@ async function update() {
   try {
     const avatar = await referenceMetadata(reference);
     if (ownVersion !== version || !connection) return;
-    await connection.set({ image: reference, prompt: TRANSFORMATION_PROMPT, enhance: ENHANCE_PROMPT });
+    if (sessionPrompt === null) throw new Error("Reconnect to load the Railway processing prompt.");
+    await connection.set({ image: reference, prompt: sessionPrompt, enhance: ENHANCE_PROMPT });
     if (ownVersion === version) { usage?.avatar(avatar); appliedReference = reference; notice.hidden = true; status("AI transformation live", "live"); }
   } catch (error) {
     if (ownVersion === version) showError(error);
