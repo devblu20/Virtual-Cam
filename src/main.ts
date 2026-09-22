@@ -141,7 +141,7 @@ function status(text: string, tone = "idle") {
 }
 function errorText(error: unknown, fallback = "The operation failed without an error message. Stop and reconnect; contact Bluqq support if it continues."): string {
   // SDK errors are plain objects, not necessarily Error instances. Read only
-  // public message fields, never dump data, cause, stack or request headers.
+  // public message fields, never dump data, whole causes, stacks or headers.
   function describe(value: unknown, depth = 0): string {
     if (depth > 3) return "";
     if (typeof value === "string") return value.trim() === "[object Object]" ? "" : value.trim();
@@ -149,8 +149,18 @@ function errorText(error: unknown, fallback = "The operation failed without an e
     if (Array.isArray(value)) return value.slice(0, 3).map(item => describe(item, depth + 1)).filter(Boolean).join("; ");
     const item = value as Record<string, unknown>;
     const code = typeof item.code === "string" && /^[A-Z0-9_.-]{1,64}$/.test(item.code) ? item.code : "";
-    const message = [item.message, item.detail, item.msg, item.error]
+    let message = [item.message, item.detail, item.msg, item.error]
       .map(part => describe(part, depth + 1)).find(Boolean) || "";
+    // The pinned SDK uses this generic wrapper for otherwise unclassified
+    // errors, including initial-state rejections. Its cause holds the useful
+    // message. Read only that string, then apply the same redaction below.
+    if (code === "WEBRTC_SIGNALING_ERROR" && item.cause && typeof item.cause === "object") {
+      const causeMessage = (item.cause as { message?: unknown }).message;
+      if (typeof causeMessage === "string" && causeMessage.trim() &&
+          causeMessage.trim() !== "[object Object]" && causeMessage.trim() !== message) {
+        message += `${message ? ": " : ""}${causeMessage.trim()}`;
+      }
+    }
     return code ? `[${code}] ${message || fallback}` : message;
   }
   let text = describe(error) || fallback;

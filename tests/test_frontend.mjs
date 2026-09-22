@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import { createHash } from "node:crypto";
 import { transformWithOxc } from "vite";
+import { classifyWebrtcError } from "../node_modules/@decartai/sdk/dist/utils/errors.js";
 
 const usageSource = readFileSync(new URL("../src/usage.ts", import.meta.url), "utf8").replace(/^export /gm, "");
 const source = usageSource + "\n" + readFileSync(new URL("../src/main.ts", import.meta.url), "utf8")
@@ -182,6 +183,50 @@ test("SDK runtime errors and reference-update errors use the same readable forma
     assert.equal(h.el("notice").textContent, "[WEBRTC_ICE_ERROR] ICE connection failed");
     assert.equal(h.remote.track.stopped, true);
   } finally { h.cleanup(); }
+});
+
+test("real installed SDK signaling wrapper exposes its original message safely", async () => {
+  const h = harness();
+  try {
+    let fail;
+    h.connection.on = (name, callback) => { if (name === "error") fail = callback; };
+    await h.click("cameraButton"); await h.click("connectButton");
+    const original = new Error("Example initial-state rejection.");
+    const wrapped = classifyWebrtcError(original);
+    assert.equal(wrapped.code, "WEBRTC_SIGNALING_ERROR");
+    assert.equal(wrapped.message, "Signaling error");
+    fail(wrapped);
+    assert.equal(h.el("notice").textContent, "[WEBRTC_SIGNALING_ERROR] Signaling error: Example initial-state rejection.");
+    assert.equal(h.remote.track.stopped, true);
+  } finally { h.cleanup(); }
+});
+
+test("nested signaling details redact secrets without exposing cause internals", async () => {
+  const h = harness();
+  try {
+    const original = new Error(`Rejected short-lived-test-token ${h.el("accessKey").value} wss://example.test/?api_key=secret`);
+    original.data = { private: "must-not-display" };
+    original.cause = { message: "deeper-private-message" };
+    h.hooks.connect = async () => { throw classifyWebrtcError(original); };
+    await h.click("cameraButton"); await h.click("connectButton");
+    const text = h.el("notice").textContent;
+    assert.match(text, /Signaling error: Rejected/);
+    assert.doesNotMatch(text, /short-lived-test-token|fake-test-access|example\.test|api_key|must-not-display|deeper-private-message/);
+    assert.match(text, /redacted/);
+  } finally { h.cleanup(); }
+});
+
+test("missing or cyclic signaling causes keep the readable outer error", async () => {
+  for (const cause of [null, {}, { message: "Signaling error" }, { message: "[object Object]" }]) {
+    const h = harness();
+    try {
+      const error = { code: "WEBRTC_SIGNALING_ERROR", message: "Signaling error", cause };
+      if (cause && !Object.keys(cause).length) cause.message = cause;
+      h.hooks.connect = async () => { throw error; };
+      await h.click("cameraButton"); await h.click("connectButton");
+      assert.equal(h.el("notice").textContent, "[WEBRTC_SIGNALING_ERROR] Signaling error");
+    } finally { h.cleanup(); }
+  }
 });
 
 test("backend structured errors retain HTTP status and validation messages", async () => {
