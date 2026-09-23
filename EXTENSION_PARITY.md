@@ -2,7 +2,7 @@
 
 ## Current prompt delivery (extension 0.3.16+)
 
-The website and updated extension now read the same prompt from Railway's `transformation_prompt.txt` through each authenticated token response. The existing wording has been preserved. Active sessions pin their received prompt, including reference changes; a new connection fetches the latest server version. The historical bundled-prompt notes below describe the earlier implementation, not the current source of instructions. See `RAILWAY_PROMPT_SETUP.md`.
+The website and compatible updated clients read the prompt from Railway's `transformation_prompt.txt` through each authenticated token response. The prompt was revised on 2026-09-23 to address background-color drift and object reinterpretation. Active sessions pin their received prompt, including reference changes; a new connection fetches the latest server version. The historical bundled-prompt notes below describe the earlier implementation. See `RAILWAY_PROMPT_SETUP.md`.
 
 Current tests validate server-provided prompt delivery and the unchanged video settings. The old fixture is retained as a historical record, not a second editable prompt source.
 

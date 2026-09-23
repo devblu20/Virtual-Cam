@@ -1,13 +1,13 @@
 # One prompt, managed on Railway
 
-The only editable production transformation prompt is `transformation_prompt.txt`
-in this project. Its original wording is preserved verbatim. With approval on
-2026-09-22, instructions for stable backgrounds, realistic objects and faithful
-document/phone-screen content were appended, not substituted for the original.
+The website's editable production transformation prompt is
+`transformation_prompt.txt` in this project. On 2026-09-23, the approved prompt
+was aligned with the extension to address background-color drift and prevent
+held or entering objects from being reinterpreted.
 
-The provider rejected the first expanded version (1,795 characters), reporting
-that only its first 1,065 characters fit this model. The added section has been
-condensed to 192 characters, retaining the original 792-character prompt verbatim.
+The provider rejected an earlier expanded version (1,795 characters), reporting
+that only its first 1,065 characters fit this model. The current complete prompt
+is 1,021 characters.
 This is a prompt-specific provider rejection, not proof of a universal character
 limit. Local schema validation cannot guarantee the provider's model budget;
 validate future prompt changes with a live connection before public rollout.
