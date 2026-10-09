@@ -79,12 +79,44 @@
           <input id="referenceInput" type="file" accept="image/png,image/jpeg,image/webp" aria-describedby="referenceGuidance referenceDetails referenceState" />
           <p class="hint" id="referenceGuidance">Use one sharp, front-facing person with the full hair, beard, shoulders and upper-body clothing visible. At least 512 × 512 pixels; a sharp original around 1280 pixels on the long side is preferable. Avoid full-body shots with a tiny face. Match this chest-up framing in your camera and use even front lighting.</p>
           <div class="reference-review">
-            <img id="referencePreview" alt="Selected reference portrait, shown without cropping" hidden />
-            <div>
+            <div class="reference-comparison" id="referenceComparison" hidden>
+              <figure class="reference-figure">
+                <figcaption>Original photo</figcaption>
+                <img id="originalReferencePreview" alt="Original selected reference portrait" />
+              </figure>
+              <figure class="reference-figure edited-reference" id="editedReferenceFigure" hidden>
+                <figcaption>Gemini output · active reference</figcaption>
+                <img id="referencePreview" alt="Gemini-edited reference portrait" />
+              </figure>
+            </div>
+            <div class="reference-copy">
               <p class="hint" id="referenceDetails" aria-live="polite"></p>
               <p class="hint" id="referenceState" aria-live="polite">Choose a reference before connecting.</p>
             </div>
           </div>
+          <details class="shirt-editor" id="shirtEditor">
+            <summary>Edit clothing with Gemini</summary>
+            <p class="hint">Recolour an existing shirt or replace a kurti, top or blouse with a plain collared shirt. Generate sends this photo through OpenRouter to Gemini for image editing. If you do nothing here, the original Virtual CAM flow stays unchanged.</p>
+            <div class="shirt-editor-grid">
+              <label class="editor-field">Shirt colour
+                <span class="colour-control"><input id="shirtColourPicker" type="color" value="#efb4be" aria-label="Pick shirt colour" /><input id="shirtColour" type="text" maxlength="80" value="soft blush pink" /></span>
+              </label>
+              <label class="editor-field">Edit type
+                <select id="shirtEditMode"><option value="auto">Auto — recolour or add shirt</option><option value="recolor">Colour existing shirt only</option></select>
+              </label>
+              <label class="editor-field">Framing
+                <select id="shirtFraming"><option value="auto">Auto portrait crop</option><option value="original">Keep original frame</option></select>
+              </label>
+              <label class="editor-field" id="shirtRatioField">Frame shape
+                <select id="shirtAspectRatio"><option value="4:5">4:5 portrait</option><option value="3:4">3:4 portrait</option><option value="1:1">1:1 square</option></select>
+              </label>
+            </div>
+            <div class="actions editor-actions">
+              <button class="primary" id="generateShirtEditButton" type="button" disabled>Generate shirt edit</button>
+              <button class="secondary" id="useOriginalReferenceButton" type="button" disabled>Use original photo</button>
+            </div>
+            <p class="hint editor-status" id="shirtEditStatus" aria-live="polite">Choose a reference photo to enable editing.</p>
+          </details>
         </div>
 
         <div class="field field-wide">

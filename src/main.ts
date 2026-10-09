@@ -30,8 +30,20 @@ const outputPlaceholder = el<HTMLElement>("outputPlaceholder");
 const cameraSelect = el<HTMLSelectElement>("cameraSelect");
 const referenceInput = el<HTMLInputElement>("referenceInput");
 const referencePreview = el<HTMLImageElement>("referencePreview");
+const originalReferencePreview = el<HTMLImageElement>("originalReferencePreview");
+const referenceComparison = el<HTMLElement>("referenceComparison");
+const editedReferenceFigure = el<HTMLElement>("editedReferenceFigure");
 const referenceDetails = el<HTMLElement>("referenceDetails");
 const referenceState = el<HTMLElement>("referenceState");
+const shirtColourPicker = el<HTMLInputElement>("shirtColourPicker");
+const shirtColour = el<HTMLInputElement>("shirtColour");
+const shirtEditMode = el<HTMLSelectElement>("shirtEditMode");
+const shirtFraming = el<HTMLSelectElement>("shirtFraming");
+const shirtAspectRatio = el<HTMLSelectElement>("shirtAspectRatio");
+const shirtRatioField = el<HTMLElement>("shirtRatioField");
+const generateShirtEditButton = el<HTMLButtonElement>("generateShirtEditButton");
+const useOriginalReferenceButton = el<HTMLButtonElement>("useOriginalReferenceButton");
+const shirtEditStatus = el<HTMLElement>("shirtEditStatus");
 const cameraDetails = el<HTMLElement>("cameraDetails");
 const outputDetails = el<HTMLElement>("outputDetails");
 const networkDetails = el<HTMLElement>("networkDetails");
@@ -54,6 +66,9 @@ let checkingReference = false;
 let preparedReference: File | null = null;
 let appliedReference: File | null = null;
 let referenceUrl: string | null = null;
+let originalReferenceUrl: string | null = null;
+let originalReference: File | null = null;
+let editingReference = false;
 let usage: UsageReporter | null = null;
 // Memory-only, retained through stop() so a failed connection's token can be
 // redacted from its error. Replaced on the next token request; never logged.
@@ -73,7 +88,53 @@ function releaseReferencePreview() {
   if (referenceUrl) URL.revokeObjectURL(referenceUrl);
   referenceUrl = null;
   referencePreview.removeAttribute("src");
-  referencePreview.hidden = true;
+  editedReferenceFigure.hidden = true;
+}
+function showOriginalReference(file: File | null) {
+  if (originalReferenceUrl) URL.revokeObjectURL(originalReferenceUrl);
+  originalReferenceUrl = null;
+  originalReferencePreview.removeAttribute("src");
+  referenceComparison.hidden = !file;
+  if (!file) return;
+  originalReferenceUrl = URL.createObjectURL(file);
+  originalReferencePreview.src = originalReferenceUrl;
+}
+function setShirtEditStatus(text: string, tone = "idle") {
+  shirtEditStatus.textContent = text;
+  shirtEditStatus.dataset.tone = tone;
+}
+function replaceReferenceFile(file: File) {
+  const transfer = new DataTransfer();
+  transfer.items.add(file);
+  referenceInput.files = transfer.files;
+}
+const frameRatios: Record<string, number> = { "4:5": 4 / 5, "3:4": 3 / 4, "1:1": 1 };
+async function cropPortraitFile(file: Blob, ratioName: string, outputName: string): Promise<File> {
+  const bitmap = await createImageBitmap(file);
+  const ratio = frameRatios[ratioName] || frameRatios["4:5"];
+  let sourceX = 0, sourceY = 0, sourceWidth = bitmap.width, sourceHeight = bitmap.height;
+  if (sourceWidth / sourceHeight > ratio) {
+    const croppedWidth = sourceHeight * ratio;
+    sourceX = (sourceWidth - croppedWidth) / 2;
+    sourceWidth = croppedWidth;
+  } else {
+    const croppedHeight = sourceWidth / ratio;
+    sourceY = Math.max(0, (sourceHeight - croppedHeight) * 0.2);
+    sourceHeight = croppedHeight;
+  }
+  const scale = Math.min(1, 1600 / Math.max(sourceWidth, sourceHeight));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+  canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+  const context = canvas.getContext("2d");
+  if (!context) { bitmap.close(); throw new Error("This browser could not prepare the portrait frame."); }
+  context.drawImage(bitmap, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(
+    value => value ? resolve(value) : reject(new Error("This browser could not crop the portrait.")),
+    "image/jpeg", 0.95,
+  ));
+  return new File([blob], outputName, { type: "image/jpeg" });
 }
 async function prepareReference() {
   const ownVersion = ++referenceVersion;
@@ -96,11 +157,18 @@ async function prepareReference() {
       throw new Error(`Reference is only ${bitmap.width} × ${bitmap.height}. Use an original image at least 512 × 512; upscaling does not restore face detail.`);
     }
     preparedReference = file;
-    referenceUrl = URL.createObjectURL(file);
-    referencePreview.src = referenceUrl;
-    referencePreview.hidden = false;
     const modestSize = Math.min(bitmap.width, bitmap.height) < 768;
-    referenceDetails.textContent = `${bitmap.width} × ${bitmap.height} · Original image used without cropping or recompression.${modestSize ? " A sharper, larger original can retain more beard and hair detail." : " Check that the face, full hair, beard, shoulders and clothing are visible."}`;
+    const isEdited = !!originalReference && file !== originalReference;
+    if (isEdited) {
+      referenceUrl = URL.createObjectURL(file);
+      referencePreview.src = referenceUrl;
+      editedReferenceFigure.hidden = false;
+    } else {
+      editedReferenceFigure.hidden = true;
+    }
+    referenceDetails.textContent = isEdited
+      ? `${bitmap.width} × ${bitmap.height} · AI shirt edit is now the active reference.${modestSize ? " A larger source can retain more facial detail." : " Check the face, framing, shirt and background before connecting."}`
+      : `${bitmap.width} × ${bitmap.height} · Original image used without cropping or recompression.${modestSize ? " A sharper, larger original can retain more beard and hair detail." : " Check that the face, full hair, beard, shoulders and clothing are visible."}`;
     referenceDetails.dataset.tone = modestSize ? "warning" : "idle";
   } catch (error) {
     if (ownVersion !== referenceVersion) return;
@@ -172,6 +240,9 @@ function errorText(error: unknown, fallback = "The operation failed without an e
   text = text.replace(/\b(?:https?|wss?):\/\/[^\s<>"']+/gi, "[URL redacted]")
     .replace(/\bBearer\s+[^\s,;"']+/gi, "Bearer [redacted]")
     .replace(/\b(api[_-]?key|access[_-]?key|token|authorization)\s*[=:]\s*[^\s,;]+/gi, "$1=[redacted]");
+  if (text.trim() === "[redacted]") {
+    return "A credential-related message was hidden for safety. Refresh the page and try the action again.";
+  }
   return text.length > 1200 ? text.slice(0, 1199) + "…" : text;
 }
 function showError(error: unknown) {
@@ -182,7 +253,7 @@ function showError(error: unknown) {
 function syncControls() {
   cameraButton.disabled = busy || !!connection;
   cameraSelect.disabled = busy || !!connection;
-  referenceInput.disabled = busy;
+  referenceInput.disabled = busy || editingReference;
   consent.disabled = busy || !!connection;
   accessKey.disabled = busy || !!connection;
   const validReference = !!preparedReference && preparedReference === referenceInput.files?.[0] && !checkingReference;
@@ -190,8 +261,77 @@ function syncControls() {
   updateButton.disabled = busy || !connection || !validReference;
   fullscreenButton.disabled = !remote;
   stopButton.disabled = !camera && !remote && !busy;
+  generateShirtEditButton.disabled = busy || editingReference || !originalReference;
+  useOriginalReferenceButton.disabled = busy || editingReference || !originalReference || referenceInput.files?.[0] === originalReference;
+  for (const control of [shirtColourPicker, shirtColour, shirtEditMode, shirtFraming, shirtAspectRatio]) {
+    control.disabled = busy || editingReference || (control === shirtAspectRatio && shirtFraming.value === "original");
+  }
+  shirtRatioField.classList.toggle("disabled", shirtFraming.value === "original");
   cameraButton.textContent = camera ? "Restart camera" : "Start camera";
   syncReferenceState();
+}
+
+async function generateShirtEdit() {
+  if (busy || editingReference || !originalReference) return;
+  if (accessKey.value.trim().length < 32) {
+    setShirtEditStatus("Enter your Bluqq personal access key before generating an edit.", "error");
+    return;
+  }
+  const source = originalReference;
+  const ownVersion = referenceVersion;
+  editingReference = true;
+  syncControls();
+  const started = Date.now();
+  setShirtEditStatus("Preparing portrait frame…", "working");
+  let timer = 0;
+  try {
+    const upload = shirtFraming.value === "auto"
+      ? await cropPortraitFile(source, shirtAspectRatio.value, "prepared-reference.jpg")
+      : source;
+    setShirtEditStatus("Editing clothing… 0s", "working");
+    timer = window.setInterval(() => {
+      setShirtEditStatus(`Editing clothing… ${Math.floor((Date.now() - started) / 1000)}s`, "working");
+    }, 1000);
+    const query = new URLSearchParams({
+      color: shirtColour.value.trim() || "soft blush pink",
+      mode: shirtEditMode.value,
+      framing: shirtFraming.value,
+      aspect_ratio: shirtAspectRatio.value,
+    });
+    const response = await fetch(`/api/edit-reference?${query}`, {
+      method: "POST",
+      headers: { Authorization: "Bearer " + accessKey.value.trim(), "Content-Type": upload.type },
+      body: upload,
+      cache: "no-store",
+      credentials: "omit",
+      redirect: "error",
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(errorText(payload, "Could not edit this reference image."));
+    }
+    let edited: File = new File([await response.blob()], "shirt-edited-reference.jpg", { type: "image/jpeg" });
+    if (shirtFraming.value === "auto") {
+      edited = await cropPortraitFile(edited, shirtAspectRatio.value, "shirt-edited-reference.jpg");
+    }
+    if (ownVersion !== referenceVersion || source !== originalReference) return;
+    replaceReferenceFile(edited);
+    await prepareReference();
+    setShirtEditStatus(`Shirt edit ready in exact ${shirtAspectRatio.value} framing. It is now used by Connect, Apply reference and Save to extension.`, "success");
+  } catch (error) {
+    if (ownVersion === referenceVersion) setShirtEditStatus(errorText(error, "Could not edit this reference image."), "error");
+  } finally {
+    window.clearInterval(timer);
+    editingReference = false;
+    syncControls();
+  }
+}
+
+async function useOriginalReference() {
+  if (!originalReference || busy || editingReference) return;
+  replaceReferenceFile(originalReference);
+  await prepareReference();
+  setShirtEditStatus("Original reference restored. Existing Virtual CAM behaviour is active.", "success");
 }
 function clearRemote() {
   const previous = connection;
@@ -415,7 +555,23 @@ cameraButton.addEventListener("click", () => void startCamera());
 connectButton.addEventListener("click", () => void connect());
 updateButton.addEventListener("click", () => void update());
 stopButton.addEventListener("click", () => stop());
-referenceInput.addEventListener("change", () => void prepareReference());
+referenceInput.addEventListener("change", () => {
+  originalReference = referenceInput.files?.[0] || null;
+  showOriginalReference(originalReference);
+  setShirtEditStatus(originalReference
+    ? "Original photo ready. Editing is optional."
+    : "Choose a reference photo to enable editing.");
+  void prepareReference();
+});
+shirtColourPicker.addEventListener("input", () => { shirtColour.value = `${shirtColourPicker.value} solid colour`; });
+shirtFraming.addEventListener("change", syncControls);
+accessKey.addEventListener("input", () => {
+  if (shirtEditStatus.textContent?.trim() === "[redacted]") {
+    setShirtEditStatus("Personal key updated. Press Generate shirt edit again.");
+  }
+});
+generateShirtEditButton.addEventListener("click", () => void generateShirtEdit());
+useOriginalReferenceButton.addEventListener("click", () => void useOriginalReference());
 // A new device needs fresh camera constraints.
 cameraSelect.addEventListener("change", () => {
   if (camera) { stop(); status("Settings changed — start camera again"); }
@@ -427,7 +583,7 @@ outputVideo.addEventListener("resize", updateOutputDetails);
 consent.addEventListener("change", syncControls);
 el<HTMLButtonElement>("refreshCamerasButton").addEventListener("click", () => void loadCameras().catch(showError));
 fullscreenButton.addEventListener("click", () => void el<HTMLElement>("outputCard").requestFullscreen().catch(showError));
-window.addEventListener("pagehide", () => { stop("closed"); ++referenceVersion; checkingReference = false; preparedReference = null; releaseReferencePreview(); });
+window.addEventListener("pagehide", () => { stop("closed"); ++referenceVersion; checkingReference = false; preparedReference = null; releaseReferencePreview(); showOriginalReference(null); });
 window.addEventListener("pageshow", () => { if (referenceInput.files?.[0] && !preparedReference) void prepareReference(); });
 window.addEventListener("beforeunload", () => stop("closed"));
 syncControls();

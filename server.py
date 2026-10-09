@@ -2,6 +2,7 @@
 Run one process/replica: quotas are process-local, not video-minute limits.
 """
 import asyncio
+import base64
 import hashlib
 import hmac
 import json
@@ -9,6 +10,8 @@ import logging
 import os
 import re
 import time
+import urllib.error
+import urllib.request
 from collections import defaultdict, deque
 from pathlib import Path
 
@@ -16,7 +19,7 @@ import uvicorn
 from decart import DecartClient
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from reference_library import register_reference_routes
 from usage_history import register_usage_routes, small_json, usage_metadata
@@ -26,6 +29,84 @@ from processing_config import load_processing_config
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 logger = logging.getLogger("virtualcam")
+
+
+class OpenRouterError(Exception):
+    def __init__(self, status: int, message: str):
+        super().__init__(message)
+        self.status = status
+
+
+def shirt_edit_prompt(color: str, mode: str, framing: str, aspect_ratio: str) -> str:
+    garment = (
+        f"Change only the existing shirt colour to {color}. Preserve its exact collar, "
+        "placket, buttons, pockets, sleeves, seams, fit, fabric texture, natural wrinkles, "
+        "folds, shadows, highlights and drape."
+        if mode == "recolor" else
+        f"Inspect the upper garment. If it is already a collared button-front shirt, change "
+        f"its colour to {color} while preserving its construction and details. If it is a "
+        f"kurta, kurti, T-shirt, blouse, dress top or another garment, replace only that upper "
+        f"garment with a plain {color} collared button-front shirt. Fit the new shirt naturally "
+        "to the existing body and pose with realistic collar, placket, buttons, seams, sleeves, "
+        "fabric texture, wrinkles, folds, shadows, highlights and drape. Keep the neckline modestly covered."
+    )
+    frame = (
+        f"Preserve the supplied {aspect_ratio} portrait frame exactly. Keep the face centred, "
+        "leave comfortable space above the hair, and keep the full head, chin and shoulders visible. "
+        "Do not zoom or crop further."
+        if framing == "auto" else
+        "Preserve the supplied image's exact framing, crop, composition and aspect ratio."
+    )
+    return f"""Edit the supplied reference portrait with strict garment-only inpainting.
+
+{garment}
+
+Keep the shirt plain without copied patterns, embroidery, logos or text. Make the fabric naturally worn and wrinkled; do not flatten or beautify it.
+
+Keep every non-garment detail unchanged: identity, gender, face, facial features, expression, hair, beard, skin tone, neck, jewellery, hands, body shape, pose, proportions, background, camera angle, focus, lighting and image quality. Do not retouch the person.
+
+{frame}
+
+Return one photorealistic edited image only."""
+
+
+def request_openrouter_image(api_key: str, payload: dict) -> tuple[bytes, str]:
+    request = urllib.request.Request(
+        "https://openrouter.ai/api/v1/images",
+        data=json.dumps(payload, separators=(",", ":")).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://virtual-cam-production-9734.up.railway.app/",
+            "X-OpenRouter-Title": "Bluqq Virtual CAM",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=95) as upstream:
+            body = upstream.read(30 * 1024 * 1024)
+    except urllib.error.HTTPError as error:
+        raw = error.read(64 * 1024)
+        try:
+            detail = json.loads(raw).get("error", {}).get("message", "")
+        except (ValueError, AttributeError):
+            detail = ""
+        safe = detail if isinstance(detail, str) and len(detail) <= 500 else ""
+        raise OpenRouterError(error.code, safe or "Image-editing provider rejected the request.") from None
+    except (urllib.error.URLError, TimeoutError):
+        raise OpenRouterError(504, "Image editing timed out. Try again.") from None
+
+    try:
+        result = json.loads(body)
+        output = result["data"][0]
+        encoded = output["b64_json"]
+        media_type = output.get("media_type") or "image/jpeg"
+        image = base64.b64decode(encoded, validate=True)
+    except (ValueError, TypeError, KeyError, IndexError):
+        raise OpenRouterError(502, "Image-editing provider returned an invalid image.") from None
+    if not image or len(image) > 20 * 1024 * 1024 or media_type not in {"image/jpeg", "image/png", "image/webp"}:
+        raise OpenRouterError(502, "Image-editing provider returned an unsupported image.")
+    return image, media_type
 
 
 def load_access_keys() -> dict[str, str]:
@@ -56,6 +137,10 @@ def create_app() -> FastAPI:
     daily_requests: dict[str, deque[float]] = defaultdict(deque)
     global_requests: deque[float] = deque()
     quota_lock = asyncio.Lock()
+    edit_minute_requests: dict[str, deque[float]] = defaultdict(deque)
+    edit_daily_requests: dict[str, deque[float]] = defaultdict(deque)
+    edit_global_requests: deque[float] = deque()
+    edit_quota_lock = asyncio.Lock()
     usage_store = register_usage_routes(app, access_keys)
 
     async def record_usage(method, *args):
@@ -146,6 +231,84 @@ def create_app() -> FastAPI:
             # Upstream exception text may contain credentials. Do not log it.
             logger.warning("Decart token request failed")
             raise HTTPException(502, "AI processing connection failed. Ask Bluqq support to check service access and credits.") from None
+
+    @app.post("/api/edit-reference")
+    async def edit_reference(request: Request):
+        openrouter_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+        if not openrouter_key:
+            raise HTTPException(503, "Reference image editing is not configured yet.")
+
+        authorization = request.headers.get("Authorization", "")
+        supplied = authorization[7:] if authorization.startswith("Bearer ") else ""
+        if not 32 <= len(supplied) <= 256:
+            raise HTTPException(401, "Enter a valid personal access key.")
+        candidate = hashlib.sha256(supplied.encode("utf-8")).hexdigest()
+        user = None
+        for user_id, digest in access_keys.items():
+            if hmac.compare_digest(candidate, digest):
+                user = user_id
+        if user is None:
+            raise HTTPException(401, "Access key is invalid or revoked.")
+
+        content_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+        if content_type not in {"image/jpeg", "image/png", "image/webp"}:
+            raise HTTPException(415, "Choose a JPEG, PNG or WebP reference image.")
+        content_length = request.headers.get("content-length", "")
+        if content_length.isdigit() and int(content_length) > 10 * 1024 * 1024:
+            raise HTTPException(413, "Reference image must be 10 MB or smaller.")
+        image = await request.body()
+        if not image or len(image) > 10 * 1024 * 1024:
+            raise HTTPException(413, "Reference image must be between 1 byte and 10 MB.")
+
+        color = request.query_params.get("color", "soft blush pink").strip()
+        mode = request.query_params.get("mode", "auto")
+        framing = request.query_params.get("framing", "auto")
+        aspect_ratio = request.query_params.get("aspect_ratio", "4:5")
+        if not 1 <= len(color) <= 80 or any(ord(character) < 32 for character in color):
+            raise HTTPException(400, "Enter a valid shirt colour.")
+        if mode not in {"auto", "recolor"} or framing not in {"auto", "original"}:
+            raise HTTPException(400, "Invalid shirt edit option.")
+        if aspect_ratio not in {"4:5", "3:4", "1:1"}:
+            raise HTTPException(400, "Invalid frame shape.")
+
+        async with edit_quota_lock:
+            now = time.monotonic()
+            limits = [(edit_minute_requests[user], 60, 3),
+                      (edit_daily_requests[user], 86400, 30),
+                      (edit_global_requests, 60, 12)]
+            for bucket, window, maximum in limits:
+                while bucket and now - bucket[0] >= window:
+                    bucket.popleft()
+                if len(bucket) >= maximum:
+                    retry = max(1, int(window - (now - bucket[0])) + 1)
+                    raise HTTPException(429, "Image edit limit reached. Try later.",
+                                        headers={"Retry-After": str(retry)})
+            for bucket, _, _ in limits:
+                bucket.append(now)
+
+        source = f"data:{content_type};base64,{base64.b64encode(image).decode('ascii')}"
+        payload = {
+            "model": "google/gemini-3.1-flash-lite-image",
+            "prompt": shirt_edit_prompt(color, mode, framing, aspect_ratio),
+            "input_references": [{"type": "image_url", "image_url": {"url": source}}],
+            "resolution": "1K",
+            "output_format": "jpeg",
+            "n": 1,
+        }
+        if framing == "auto":
+            payload["aspect_ratio"] = aspect_ratio
+        try:
+            edited, media_type = await run_in_threadpool(request_openrouter_image, openrouter_key, payload)
+            return Response(edited, media_type=media_type, headers={"Content-Disposition": "inline"})
+        except OpenRouterError as error:
+            if error.status == 402:
+                raise HTTPException(402, "OpenRouter credits are insufficient.") from None
+            if error.status == 429:
+                raise HTTPException(429, "Image-editing provider rate limit reached. Try again shortly.") from None
+            if error.status == 504:
+                raise HTTPException(504, str(error)) from None
+            logger.warning("OpenRouter image edit failed with status %s", error.status)
+            raise HTTPException(502, "Reference image editing failed. Try again.") from None
 
     register_reference_routes(app, access_keys)
 
