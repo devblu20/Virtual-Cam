@@ -109,11 +109,35 @@ function replaceReferenceFile(file: File) {
   referenceInput.files = transfer.files;
 }
 const frameRatios: Record<string, number> = { "4:5": 4 / 5, "3:4": 3 / 4, "1:1": 1 };
+type FaceDetectorResult = { boundingBox: { x: number; y: number; width: number; height: number } };
+type FaceDetectorInstance = { detect(source: ImageBitmap): Promise<FaceDetectorResult[]> };
+type FaceDetectorConstructor = new (options?: { fastMode?: boolean; maxDetectedFaces?: number }) => FaceDetectorInstance;
 async function cropPortraitFile(file: Blob, ratioName: string, outputName: string): Promise<File> {
   const bitmap = await createImageBitmap(file);
   const ratio = frameRatios[ratioName] || frameRatios["4:5"];
   let sourceX = 0, sourceY = 0, sourceWidth = bitmap.width, sourceHeight = bitmap.height;
-  if (sourceWidth / sourceHeight > ratio) {
+  const Detector = (window as unknown as { FaceDetector?: FaceDetectorConstructor }).FaceDetector;
+  let face: FaceDetectorResult | undefined;
+  if (Detector) {
+    try {
+      const faces = await new Detector({ fastMode: true, maxDetectedFaces: 1 }).detect(bitmap);
+      face = faces.sort((left, right) =>
+        right.boundingBox.width * right.boundingBox.height - left.boundingBox.width * left.boundingBox.height,
+      )[0];
+    } catch { /* Ratio-only fallback keeps auto framing available. */ }
+  }
+  if (face) {
+    const box = face.boundingBox;
+    const desiredHeight = Math.min(
+      bitmap.height,
+      bitmap.width / ratio,
+      Math.max(box.height / 0.2, box.width / (0.28 * ratio)),
+    );
+    sourceHeight = desiredHeight;
+    sourceWidth = desiredHeight * ratio;
+    sourceX = Math.min(Math.max(0, box.x + box.width / 2 - sourceWidth / 2), bitmap.width - sourceWidth);
+    sourceY = Math.min(Math.max(0, box.y - sourceHeight * 0.1), bitmap.height - sourceHeight);
+  } else if (sourceWidth / sourceHeight > ratio) {
     const croppedWidth = sourceHeight * ratio;
     sourceX = (sourceWidth - croppedWidth) / 2;
     sourceWidth = croppedWidth;

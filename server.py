@@ -40,20 +40,25 @@ class OpenRouterError(Exception):
 def shirt_edit_prompt(color: str, mode: str, framing: str, aspect_ratio: str) -> str:
     garment = (
         f"Change only the existing shirt colour to {color}. Preserve its exact collar, "
-        "placket, buttons, pockets, sleeves, seams, fit, fabric texture, natural wrinkles, "
-        "folds, shadows, highlights and drape."
+        "placket, buttons, pockets, sleeves, seams and fit. Add clearly visible but natural "
+        "fabric wrinkles, creases and folds around the chest, waist, underarms, elbows, sleeves "
+        "and button placket, with physically consistent shadows, highlights and drape."
         if mode == "recolor" else
         f"Inspect the upper garment. If it is already a collared button-front shirt, change "
         f"its colour to {color} while preserving its construction and details. If it is a "
         f"kurta, kurti, T-shirt, blouse, dress top or another garment, replace only that upper "
         f"garment with a plain {color} collared button-front shirt. Fit the new shirt naturally "
-        "to the existing body and pose with realistic collar, placket, buttons, seams, sleeves, "
-        "fabric texture, wrinkles, folds, shadows, highlights and drape. Keep the neckline modestly covered."
+        "to the existing body and pose with realistic collar, placket, buttons, seams and sleeves. "
+        "Add clearly visible but natural fabric wrinkles, creases and folds around the chest, waist, "
+        "underarms, elbows, sleeves and button placket, with physically consistent shadows, highlights "
+        "and drape. Keep the neckline modestly covered."
     )
     frame = (
-        f"Preserve the supplied {aspect_ratio} portrait frame exactly. Keep the face centred, "
-        "leave comfortable space above the hair, and keep the full head, chin and shoulders visible. "
-        "Do not zoom or crop further."
+        f"Create a professional chest-up {aspect_ratio} reference portrait matching this exact composition: "
+        "the person faces forward and is centred; the entire hair and head remain visible with about 8 percent "
+        "clear space above the hair; both shoulders and both upper arms are visible; show the shirt down to the "
+        "lower torso or waist; the person occupies roughly 75 to 85 percent of the frame height. Keep the camera "
+        "level and do not crop the hair, chin, shoulders, sleeves or shirt front."
         if framing == "auto" else
         "Preserve the supplied image's exact framing, crop, composition and aspect ratio."
     )
@@ -61,7 +66,7 @@ def shirt_edit_prompt(color: str, mode: str, framing: str, aspect_ratio: str) ->
 
 {garment}
 
-Keep the shirt plain without copied patterns, embroidery, logos or text. Make the fabric naturally worn and wrinkled; do not flatten or beautify it.
+Keep the shirt plain without copied patterns, embroidery, logos or text. The wrinkles must be visible at normal viewing size while remaining realistic and naturally worn. Do not make the shirt smooth, ironed, plastic-looking, excessively crumpled or damaged.
 
 Keep every non-garment detail unchanged: identity, gender, face, facial features, expression, hair, beard, skin tone, neck, jewellery, hands, body shape, pose, proportions, background, camera angle, focus, lighting and image quality. Do not retouch the person.
 
