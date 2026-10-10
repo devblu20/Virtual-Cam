@@ -38,6 +38,7 @@ const referenceState = el<HTMLElement>("referenceState");
 const shirtColourPicker = el<HTMLInputElement>("shirtColourPicker");
 const shirtColour = el<HTMLInputElement>("shirtColour");
 const shirtEditMode = el<HTMLSelectElement>("shirtEditMode");
+const shirtWrinkles = el<HTMLSelectElement>("shirtWrinkles");
 const shirtFraming = el<HTMLSelectElement>("shirtFraming");
 const shirtAspectRatio = el<HTMLSelectElement>("shirtAspectRatio");
 const shirtRatioField = el<HTMLElement>("shirtRatioField");
@@ -287,7 +288,7 @@ function syncControls() {
   stopButton.disabled = !camera && !remote && !busy;
   generateShirtEditButton.disabled = busy || editingReference || !originalReference;
   useOriginalReferenceButton.disabled = busy || editingReference || !originalReference || referenceInput.files?.[0] === originalReference;
-  for (const control of [shirtColourPicker, shirtColour, shirtEditMode, shirtFraming, shirtAspectRatio]) {
+  for (const control of [shirtColourPicker, shirtColour, shirtEditMode, shirtWrinkles, shirtFraming, shirtAspectRatio]) {
     control.disabled = busy || editingReference || (control === shirtAspectRatio && shirtFraming.value === "original");
   }
   shirtRatioField.classList.toggle("disabled", shirtFraming.value === "original");
@@ -319,6 +320,7 @@ async function generateShirtEdit() {
     const query = new URLSearchParams({
       color: shirtColour.value.trim() || "soft blush pink",
       mode: shirtEditMode.value,
+      wrinkles: shirtWrinkles.value,
       framing: shirtFraming.value,
       aspect_ratio: shirtAspectRatio.value,
     });

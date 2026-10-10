@@ -37,21 +37,22 @@ class OpenRouterError(Exception):
         self.status = status
 
 
-def shirt_edit_prompt(color: str, mode: str, framing: str, aspect_ratio: str) -> str:
+def shirt_edit_prompt(color: str, mode: str, wrinkles: str, framing: str, aspect_ratio: str) -> str:
+    wrinkle_instruction = {
+        "natural": "Preserve or create subtle natural fabric wrinkles and soft folds that match the pose.",
+        "visible": "Add clearly visible but natural fabric wrinkles, creases and folds around the chest, waist, underarms, elbows, sleeves and button placket, with physically consistent shadows and highlights.",
+        "strong": "Add strong, prominent fabric wrinkles, creases and layered folds across the chest, waist, underarms, elbows, sleeves and button placket. Keep them realistic, pose-aware and clearly visible at normal viewing size without making the shirt damaged.",
+    }[wrinkles]
     garment = (
         f"Change only the existing shirt colour to {color}. Preserve its exact collar, "
-        "placket, buttons, pockets, sleeves, seams and fit. Add clearly visible but natural "
-        "fabric wrinkles, creases and folds around the chest, waist, underarms, elbows, sleeves "
-        "and button placket, with physically consistent shadows, highlights and drape."
+        f"placket, buttons, pockets, sleeves, seams and fit. {wrinkle_instruction} Preserve realistic drape."
         if mode == "recolor" else
         f"Inspect the upper garment. If it is already a collared button-front shirt, change "
         f"its colour to {color} while preserving its construction and details. If it is a "
         f"kurta, kurti, T-shirt, blouse, dress top or another garment, replace only that upper "
         f"garment with a plain {color} collared button-front shirt. Fit the new shirt naturally "
-        "to the existing body and pose with realistic collar, placket, buttons, seams and sleeves. "
-        "Add clearly visible but natural fabric wrinkles, creases and folds around the chest, waist, "
-        "underarms, elbows, sleeves and button placket, with physically consistent shadows, highlights "
-        "and drape. Keep the neckline modestly covered."
+        f"to the existing body and pose with realistic collar, placket, buttons, seams and sleeves. "
+        f"{wrinkle_instruction} Preserve realistic drape and keep the neckline modestly covered."
     )
     frame = (
         f"Create a professional chest-up {aspect_ratio} reference portrait matching this exact composition: "
@@ -267,12 +268,15 @@ def create_app() -> FastAPI:
 
         color = request.query_params.get("color", "soft blush pink").strip()
         mode = request.query_params.get("mode", "auto")
+        wrinkles = request.query_params.get("wrinkles", "visible")
         framing = request.query_params.get("framing", "auto")
         aspect_ratio = request.query_params.get("aspect_ratio", "4:5")
         if not 1 <= len(color) <= 80 or any(ord(character) < 32 for character in color):
             raise HTTPException(400, "Enter a valid shirt colour.")
         if mode not in {"auto", "recolor"} or framing not in {"auto", "original"}:
             raise HTTPException(400, "Invalid shirt edit option.")
+        if wrinkles not in {"natural", "visible", "strong"}:
+            raise HTTPException(400, "Invalid shirt wrinkle option.")
         if aspect_ratio not in {"4:5", "3:4", "1:1"}:
             raise HTTPException(400, "Invalid frame shape.")
 
@@ -294,7 +298,7 @@ def create_app() -> FastAPI:
         source = f"data:{content_type};base64,{base64.b64encode(image).decode('ascii')}"
         payload = {
             "model": "google/gemini-3.1-flash-lite-image",
-            "prompt": shirt_edit_prompt(color, mode, framing, aspect_ratio),
+            "prompt": shirt_edit_prompt(color, mode, wrinkles, framing, aspect_ratio),
             "input_references": [{"type": "image_url", "image_url": {"url": source}}],
             "resolution": "1K",
             "output_format": "jpeg",
