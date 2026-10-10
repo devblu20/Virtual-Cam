@@ -71,6 +71,15 @@
           <p id="processingProfile">Bluqq extension 0.3.8 · Lucy 2.1</p>
           <p class="hint">The website and extension 0.3.16+ load the prompt from Railway for each new connection. Video settings: 1088 × 624 preferred camera input, up to 25 fps, no input mirroring, and provider-default output resolution.</p>
           <p class="hint">For a fair comparison, upload the same portrait selected in the extension and use the same camera and lighting. Matching settings do not guarantee identical generated frames. This preview does not capture or delay microphone audio.</p>
+          <div class="prompt-editor">
+            <label for="transformationPrompt">Transformation prompt</label>
+            <textarea id="transformationPrompt" rows="7" maxlength="4000" placeholder="Leave blank to use the current Railway default prompt."></textarea>
+            <div class="actions">
+              <button class="secondary compact" id="loadPromptButton" type="button">Load default prompt</button>
+              <button class="secondary compact" id="resetPromptButton" type="button" disabled>Reset prompt</button>
+            </div>
+            <p class="hint" id="promptStatus" aria-live="polite">Leave blank to keep the existing server-managed prompt unchanged.</p>
+          </div>
           </details>
         </div>
 

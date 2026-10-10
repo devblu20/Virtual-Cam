@@ -175,6 +175,18 @@ def create_app() -> FastAPI:
             status_code=200 if ready else 503,
         )
 
+    @app.get("/api/processing-config")
+    async def processing_configuration(request: Request):
+        authorization = request.headers.get("Authorization", "")
+        supplied = authorization[7:] if authorization.startswith("Bearer ") else ""
+        if not 32 <= len(supplied) <= 256:
+            raise HTTPException(401, "Enter a valid personal access key.")
+        candidate = hashlib.sha256(supplied.encode("utf-8")).hexdigest()
+        if not any(hmac.compare_digest(candidate, digest) for digest in access_keys.values()):
+            raise HTTPException(401, "Access key is invalid or revoked.")
+        configuration = await run_in_threadpool(load_processing_config)
+        return JSONResponse(configuration)
+
     @app.post("/api/realtime-token")
     async def realtime_token(request: Request):
         if not ready:

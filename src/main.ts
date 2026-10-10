@@ -49,6 +49,10 @@ const cameraDetails = el<HTMLElement>("cameraDetails");
 const outputDetails = el<HTMLElement>("outputDetails");
 const networkDetails = el<HTMLElement>("networkDetails");
 const accessKey = el<HTMLInputElement>("accessKey");
+const transformationPrompt = el<HTMLTextAreaElement>("transformationPrompt");
+const loadPromptButton = el<HTMLButtonElement>("loadPromptButton");
+const resetPromptButton = el<HTMLButtonElement>("resetPromptButton");
+const promptStatus = el<HTMLElement>("promptStatus");
 const consent = el<HTMLInputElement>("consent");
 const cameraButton = el<HTMLButtonElement>("cameraButton");
 const connectButton = el<HTMLButtonElement>("connectButton");
@@ -74,6 +78,7 @@ let usage: UsageReporter | null = null;
 // Memory-only, retained through stop() so a failed connection's token can be
 // redacted from its error. Replaced on the next token request; never logged.
 let diagnosticToken = "";
+let loadedDefaultPrompt = "";
 
 function model() {
   return models.realtime(EXTENSION_MODEL);
@@ -103,6 +108,10 @@ function showOriginalReference(file: File | null) {
 function setShirtEditStatus(text: string, tone = "idle") {
   shirtEditStatus.textContent = text;
   shirtEditStatus.dataset.tone = tone;
+}
+function setPromptStatus(text: string, tone = "idle") {
+  promptStatus.textContent = text;
+  promptStatus.dataset.tone = tone;
 }
 function replaceReferenceFile(file: File) {
   const transfer = new DataTransfer();
@@ -281,6 +290,9 @@ function syncControls() {
   referenceInput.disabled = busy || editingReference;
   consent.disabled = busy || !!connection;
   accessKey.disabled = busy || !!connection;
+  transformationPrompt.disabled = busy || !!connection;
+  loadPromptButton.disabled = busy || !!connection;
+  resetPromptButton.disabled = busy || !!connection || !loadedDefaultPrompt;
   const validReference = !!preparedReference && preparedReference === referenceInput.files?.[0] && !checkingReference;
   connectButton.disabled = busy || !!connection || !camera || !validReference || !consent.checked;
   updateButton.disabled = busy || !connection || !validReference;
@@ -294,6 +306,39 @@ function syncControls() {
   shirtRatioField.classList.toggle("disabled", shirtFraming.value === "original");
   cameraButton.textContent = camera ? "Restart camera" : "Start camera";
   syncReferenceState();
+}
+
+async function loadDefaultPrompt() {
+  if (busy || connection) return;
+  if (accessKey.value.trim().length < 32) {
+    setPromptStatus("Enter your Bluqq personal access key first.", "error");
+    return;
+  }
+  loadPromptButton.disabled = true;
+  setPromptStatus("Loading the current Railway prompt…", "working");
+  try {
+    const response = await fetch("/api/processing-config", {
+      headers: { Authorization: "Bearer " + accessKey.value.trim() },
+      cache: "no-store", credentials: "omit", redirect: "error",
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(errorText(payload, "Could not load the default prompt."));
+    const config = processingConfig(payload);
+    loadedDefaultPrompt = config.prompt;
+    transformationPrompt.value = config.prompt;
+    resetPromptButton.disabled = false;
+    setPromptStatus("Default prompt loaded. Edit it before connecting, or leave it unchanged.", "success");
+  } catch (error) {
+    setPromptStatus(errorText(error, "Could not load the default prompt."), "error");
+  } finally {
+    syncControls();
+  }
+}
+
+function resetTransformationPrompt() {
+  if (!loadedDefaultPrompt || busy || connection) return;
+  transformationPrompt.value = loadedDefaultPrompt;
+  setPromptStatus("Prompt reset to the current Railway default.", "success");
 }
 
 async function generateShirtEdit() {
@@ -492,6 +537,7 @@ async function connect() {
   try {
     const token = await fetchToken(abort.signal, reporter, reference);
     if (ownVersion !== version) return;
+    const effectivePrompt = transformationPrompt.value.trim() || token.config.prompt;
     const client = createDecartClient({
       apiKey: token.apiKey,
       telemetry: false,
@@ -502,7 +548,7 @@ async function connect() {
       model: model(),
       mirror: false,
       // No resolution override: use the same provider default as the ZIP.
-      initialState: { prompt: { text: token.config.prompt, enhance: ENHANCE_PROMPT }, image: reference },
+      initialState: { prompt: { text: effectivePrompt, enhance: ENHANCE_PROMPT }, image: reference },
       onRemoteStream: (stream: MediaStream) => {
         if (ownVersion !== version) { stream.getTracks().forEach(track => track.stop()); return; }
         if (remote && remote !== stream) remote.getTracks().forEach(track => track.stop());
@@ -539,7 +585,7 @@ async function connect() {
     });
     if (ownVersion !== version) { connected.disconnect(); return; }
     connection = connected;
-    sessionPrompt = token.config.prompt;
+    sessionPrompt = effectivePrompt;
     appliedReference = reference;
     connected.on("error", (error) => {
       if (ownVersion !== version) return;
@@ -591,6 +637,8 @@ referenceInput.addEventListener("change", () => {
 });
 shirtColourPicker.addEventListener("input", () => { shirtColour.value = `${shirtColourPicker.value} solid colour`; });
 shirtFraming.addEventListener("change", syncControls);
+loadPromptButton.addEventListener("click", () => void loadDefaultPrompt());
+resetPromptButton.addEventListener("click", resetTransformationPrompt);
 accessKey.addEventListener("input", () => {
   if (shirtEditStatus.textContent?.trim() === "[redacted]") {
     setShirtEditStatus("Personal key updated. Press Generate shirt edit again.");

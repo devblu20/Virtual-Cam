@@ -82,6 +82,13 @@ h1 { margin: 2px 0 0; font-size: clamp(1.7rem, 3vw, 2.5rem); letter-spacing: -0.
 .profile-details summary span { float: right; font-size: 12px; color: #94a8c7; }
 .profile-details[open] summary { margin-bottom: 12px; }
 .profile-details p { margin: 10px 0 0; }
+.prompt-editor { display: grid; gap: 9px; margin-top: 16px; padding-top: 14px; border-top: 1px solid #273044; }
+.prompt-editor > label { color: #d9e0ed; font-size: 12px; font-weight: 750; }
+.prompt-editor textarea { min-height: 150px; line-height: 1.5; }
+.prompt-editor .actions { margin-top: 2px; }
+#promptStatus[data-tone="success"] { color: #a7e4cb; }
+#promptStatus[data-tone="error"] { color: #ffabb7; }
+#promptStatus[data-tone="working"] { color: #ffd183; }
 .reference-upload { padding: 18px; background: #0b111d; border: 1px dashed #364662; border-radius: 12px; }
 input[type="file"]::file-selector-button { margin-right: 14px; padding: 9px 13px; border-radius: 7px; border: 1px solid #3d506c; background: #21324b; color: #e6efff; cursor: pointer; font: inherit; }
 .field > label:first-child { color: #d9e0ed; font-size: 0.86rem; font-weight: 750; }
