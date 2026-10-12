@@ -218,21 +218,40 @@ async function restoreOriginalHead(edited: Blob, originalCrop: Blob, outputName:
     createImageBitmap(edited),
     createImageBitmap(originalCrop),
   ]);
-  const width = editedBitmap.width;
-  const height = editedBitmap.height;
-  const scaleX = width / originalBitmap.width;
-  const scaleY = height / originalBitmap.height;
+  // The prepared original owns the final canvas. Gemini sometimes returns a
+  // zoomed portrait even when asked to preserve framing, so align its face to
+  // the original and composite only the garment area back into this canvas.
+  const width = originalBitmap.width;
+  const height = originalBitmap.height;
   let centreX = width * 0.5;
   let centreY = height * 0.3;
   let radiusX = width * 0.2;
   let radiusY = height * 0.235;
-  const face = await detectLargestFace(originalBitmap);
-  if (face) {
-    const box = face.boundingBox;
-    centreX = (box.x + box.width / 2) * scaleX;
-    centreY = (box.y + box.height * 0.38) * scaleY;
-    radiusX = box.width * scaleX * 0.76;
-    radiusY = box.height * scaleY * 0.94;
+  const [originalFace, editedFace] = await Promise.all([
+    detectLargestFace(originalBitmap),
+    detectLargestFace(editedBitmap),
+  ]);
+  const originalBox = originalFace?.boundingBox;
+  let editedScaleX = width / editedBitmap.width;
+  let editedScaleY = height / editedBitmap.height;
+  let editedX = 0;
+  let editedY = 0;
+  if (originalBox) {
+    centreX = originalBox.x + originalBox.width / 2;
+    centreY = originalBox.y + originalBox.height * 0.38;
+    radiusX = originalBox.width * 0.76;
+    radiusY = originalBox.height * 0.94;
+  }
+  if (originalBox && editedFace) {
+    const editedBox = editedFace.boundingBox;
+    const uniformScale = ((originalBox.width / editedBox.width) +
+      (originalBox.height / editedBox.height)) / 2;
+    editedScaleX = uniformScale;
+    editedScaleY = uniformScale;
+    editedX = (originalBox.x + originalBox.width / 2) -
+      (editedBox.x + editedBox.width / 2) * uniformScale;
+    editedY = (originalBox.y + originalBox.height / 2) -
+      (editedBox.y + editedBox.height / 2) * uniformScale;
   }
 
   const canvas = document.createElement("canvas");
@@ -243,7 +262,46 @@ async function restoreOriginalHead(edited: Blob, originalCrop: Blob, outputName:
     editedBitmap.close(); originalBitmap.close();
     throw new Error("This browser could not preserve the original face.");
   }
-  context.drawImage(editedBitmap, 0, 0, width, height);
+  context.drawImage(originalBitmap, 0, 0, width, height);
+
+  const alignedEdit = document.createElement("canvas");
+  alignedEdit.width = width;
+  alignedEdit.height = height;
+  const alignedContext = alignedEdit.getContext("2d");
+  const garmentMask = document.createElement("canvas");
+  garmentMask.width = width;
+  garmentMask.height = height;
+  const garmentMaskContext = garmentMask.getContext("2d");
+  if (!alignedContext || !garmentMaskContext) {
+    editedBitmap.close(); originalBitmap.close();
+    throw new Error("This browser could not preserve the original framing.");
+  }
+  alignedContext.drawImage(
+    editedBitmap,
+    editedX,
+    editedY,
+    editedBitmap.width * editedScaleX,
+    editedBitmap.height * editedScaleY,
+  );
+  const faceWidth = originalBox?.width || width * 0.24;
+  const faceBottom = originalBox ? originalBox.y + originalBox.height : height * 0.42;
+  const garmentTop = Math.max(0, faceBottom - faceWidth * 0.08);
+  const topHalfWidth = faceWidth * 1.18;
+  const bottomHalfWidth = Math.max(faceWidth * 2.2, width * 0.44);
+  const maskFeather = Math.max(10, Math.round(Math.min(width, height) * 0.018));
+  garmentMaskContext.filter = `blur(${maskFeather}px)`;
+  garmentMaskContext.fillStyle = "white";
+  garmentMaskContext.beginPath();
+  garmentMaskContext.moveTo(centreX - topHalfWidth, garmentTop);
+  garmentMaskContext.lineTo(centreX + topHalfWidth, garmentTop);
+  garmentMaskContext.lineTo(Math.min(width, centreX + bottomHalfWidth), height + maskFeather);
+  garmentMaskContext.lineTo(Math.max(0, centreX - bottomHalfWidth), height + maskFeather);
+  garmentMaskContext.closePath();
+  garmentMaskContext.fill();
+  alignedContext.globalCompositeOperation = "destination-in";
+  alignedContext.drawImage(garmentMask, 0, 0);
+  alignedContext.globalCompositeOperation = "source-over";
+  context.drawImage(alignedEdit, 0, 0);
 
   const overlay = document.createElement("canvas");
   overlay.width = width;
