@@ -181,6 +181,78 @@ async function cropPortraitFile(file: Blob, ratioName: string, outputName: strin
   ));
   return new File([blob], outputName, { type: "image/jpeg" });
 }
+async function restoreOriginalHead(edited: Blob, originalCrop: Blob, outputName: string): Promise<File> {
+  const [editedBitmap, originalBitmap] = await Promise.all([
+    createImageBitmap(edited),
+    createImageBitmap(originalCrop),
+  ]);
+  const width = editedBitmap.width;
+  const height = editedBitmap.height;
+  const scaleX = width / originalBitmap.width;
+  const scaleY = height / originalBitmap.height;
+  let centreX = width * 0.5;
+  let centreY = height * 0.3;
+  let radiusX = width * 0.2;
+  let radiusY = height * 0.235;
+  const Detector = (window as unknown as { FaceDetector?: FaceDetectorConstructor }).FaceDetector;
+  if (Detector) {
+    try {
+      const faces = await new Detector({ fastMode: false, maxDetectedFaces: 1 }).detect(originalBitmap);
+      const face = faces.sort((left, right) =>
+        right.boundingBox.width * right.boundingBox.height - left.boundingBox.width * left.boundingBox.height,
+      )[0];
+      if (face) {
+        const box = face.boundingBox;
+        centreX = (box.x + box.width / 2) * scaleX;
+        centreY = (box.y + box.height * 0.38) * scaleY;
+        radiusX = box.width * scaleX * 0.76;
+        radiusY = box.height * scaleY * 0.94;
+      }
+    } catch { /* Stable portrait-position fallback below. */ }
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    editedBitmap.close(); originalBitmap.close();
+    throw new Error("This browser could not preserve the original face.");
+  }
+  context.drawImage(editedBitmap, 0, 0, width, height);
+
+  const overlay = document.createElement("canvas");
+  overlay.width = width;
+  overlay.height = height;
+  const overlayContext = overlay.getContext("2d");
+  const mask = document.createElement("canvas");
+  mask.width = width;
+  mask.height = height;
+  const maskContext = mask.getContext("2d");
+  if (!overlayContext || !maskContext) {
+    editedBitmap.close(); originalBitmap.close();
+    throw new Error("This browser could not preserve the original face.");
+  }
+  overlayContext.drawImage(originalBitmap, 0, 0, width, height);
+  const feather = Math.max(6, Math.round(Math.min(width, height) * 0.012));
+  maskContext.filter = `blur(${feather}px)`;
+  maskContext.fillStyle = "white";
+  maskContext.beginPath();
+  maskContext.ellipse(centreX, centreY, radiusX, radiusY, 0, 0, Math.PI * 2);
+  maskContext.fill();
+  overlayContext.globalCompositeOperation = "destination-in";
+  overlayContext.drawImage(mask, 0, 0);
+  overlayContext.globalCompositeOperation = "source-over";
+  context.drawImage(overlay, 0, 0);
+  editedBitmap.close();
+  originalBitmap.close();
+
+  const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(
+    value => value ? resolve(value) : reject(new Error("This browser could not preserve the original face.")),
+    "image/jpeg", 0.95,
+  ));
+  return new File([blob], outputName, { type: "image/jpeg" });
+}
 async function prepareReference() {
   const ownVersion = ++referenceVersion;
   const file = referenceInput.files?.[0];
@@ -395,7 +467,11 @@ async function generateShirtEdit() {
     // The original was cropped deterministically before upload. Do not crop
     // the generated result a second time: another face-aware crop can shift
     // the head/body and make a garment edit look like an identity change.
-    const edited = new File([await response.blob()], "shirt-edited-reference.jpg", { type: "image/jpeg" });
+    const edited = await restoreOriginalHead(
+      await response.blob(),
+      upload,
+      "shirt-edited-reference.jpg",
+    );
     if (ownVersion !== referenceVersion || source !== originalReference) return;
     replaceReferenceFile(edited);
     await prepareReference();
