@@ -55,13 +55,10 @@ def shirt_edit_prompt(color: str, mode: str, wrinkles: str, framing: str, aspect
         f"{wrinkle_instruction} Preserve realistic drape and keep the neckline modestly covered."
     )
     frame = (
-        f"Create a professional upper-torso {aspect_ratio} reference portrait matching this exact composition: "
-        "the person faces forward and is centred; the entire hair and head remain visible with about 8 percent "
-        "clear space above the hair; both shoulders and both upper arms are visible. On the shirt placket, show "
-        "only the four uppermost visible buttons, counted from the top, and crop immediately below the fourth "
-        "button. Do not show a fifth or lower button, the belt, waistband, trousers, hips, thighs, hands or empty "
-        "space below the upper torso. Keep the camera level and do not crop the hair, chin, shoulders, sleeves, "
-        "shirt collar, placket or the fourth visible button."
+        f"The browser has already cropped the input to the required upper-torso {aspect_ratio} frame with a "
+        "small amount of clear space above the hair and only the upper four shirt buttons visible. Preserve this "
+        "exact canvas, crop, scale, composition and aspect ratio. Do not zoom, crop, extend, rotate, reframe, "
+        "reposition or resize the person or background. Return an image with the same width and height as the input."
         if framing == "auto" else
         "Preserve the supplied image's exact framing, crop, composition and aspect ratio."
     )
@@ -71,7 +68,7 @@ def shirt_edit_prompt(color: str, mode: str, wrinkles: str, framing: str, aspect
 
 Keep the shirt plain without copied patterns, embroidery, logos or text. The wrinkles must be visible at normal viewing size while remaining realistic and naturally worn. Do not make the shirt smooth, ironed, plastic-looking, excessively crumpled or damaged.
 
-Keep every non-garment detail unchanged: identity, gender, face, facial features, expression, hair, beard, skin tone, neck, jewellery, hands, body shape, pose, proportions, background, camera angle, focus, lighting and image quality. Do not retouch the person.
+Use a tightly localized garment mask and edit shirt pixels only. Copy every pixel outside the shirt unchanged from the input. In particular, keep the face, eyes, nose, lips, teeth, ears, skin, beard, hair, hairline, head shape, expression and neck pixel-for-pixel identical. Do not reconstruct, regenerate, beautify, retouch, sharpen or relight the face or hair. Keep identity, gender, body shape, pose, proportions, background, camera angle, focus, lighting and image quality unchanged.
 
 {frame}
 

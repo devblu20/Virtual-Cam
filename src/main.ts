@@ -146,7 +146,9 @@ async function cropPortraitFile(file: Blob, ratioName: string, outputName: strin
     sourceHeight = desiredHeight;
     sourceWidth = desiredHeight * ratio;
     sourceX = Math.min(Math.max(0, box.x + box.width / 2 - sourceWidth / 2), bitmap.width - sourceWidth);
-    sourceY = Math.min(Math.max(0, box.y - sourceHeight * 0.055), bitmap.height - sourceHeight);
+    // Leave visible breathing room above the complete hair while moving the
+    // lower edge upward toward the fourth shirt button.
+    sourceY = Math.min(Math.max(0, box.y - sourceHeight * 0.085), bitmap.height - sourceHeight);
   } else if (fourButtonCrop) {
     // Chromium does not expose FaceDetector on every Windows installation.
     // Use a deterministic upper-torso crop instead of retaining the full
@@ -390,10 +392,10 @@ async function generateShirtEdit() {
       const payload = await response.json().catch(() => ({}));
       throw new Error(errorText(payload, "Could not edit this reference image."));
     }
-    let edited: File = new File([await response.blob()], "shirt-edited-reference.jpg", { type: "image/jpeg" });
-    if (shirtFraming.value === "auto") {
-      edited = await cropPortraitFile(edited, shirtAspectRatio.value, "shirt-edited-reference.jpg");
-    }
+    // The original was cropped deterministically before upload. Do not crop
+    // the generated result a second time: another face-aware crop can shift
+    // the head/body and make a garment edit look like an identity change.
+    const edited = new File([await response.blob()], "shirt-edited-reference.jpg", { type: "image/jpeg" });
     if (ownVersion !== referenceVersion || source !== originalReference) return;
     replaceReferenceFile(edited);
     await prepareReference();
