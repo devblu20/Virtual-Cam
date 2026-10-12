@@ -55,13 +55,13 @@ def shirt_edit_prompt(color: str, mode: str, wrinkles: str, framing: str, aspect
         f"{wrinkle_instruction} Preserve realistic drape and keep the neckline modestly covered."
     )
     frame = (
-        f"Create a professional belt-up {aspect_ratio} reference portrait matching this exact composition: "
+        f"Create a professional upper-torso {aspect_ratio} reference portrait matching this exact composition: "
         "the person faces forward and is centred; the entire hair and head remain visible with about 8 percent "
-        "clear space above the hair; both shoulders and both upper arms are visible; show the complete shirt down "
-        "to the waist and keep the belt or waistband visible along the bottom edge. Crop immediately below the "
-        "belt: do not include the hips, thighs, knees or empty space below the waist. The person occupies roughly "
-        "85 to 92 percent of the frame height. Keep the camera level and do not crop the hair, chin, shoulders, "
-        "sleeves, shirt front or belt."
+        "clear space above the hair; both shoulders and both upper arms are visible. On the shirt placket, show "
+        "only the four uppermost visible buttons, counted from the top, and crop immediately below the fourth "
+        "button. Do not show a fifth or lower button, the belt, waistband, trousers, hips, thighs, hands or empty "
+        "space below the upper torso. Keep the camera level and do not crop the hair, chin, shoulders, sleeves, "
+        "shirt collar, placket or the fourth visible button."
         if framing == "auto" else
         "Preserve the supplied image's exact framing, crop, composition and aspect ratio."
     )

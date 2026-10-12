@@ -122,7 +122,7 @@ const frameRatios: Record<string, number> = { "4:5": 4 / 5, "3:4": 3 / 4, "1:1":
 type FaceDetectorResult = { boundingBox: { x: number; y: number; width: number; height: number } };
 type FaceDetectorInstance = { detect(source: ImageBitmap): Promise<FaceDetectorResult[]> };
 type FaceDetectorConstructor = new (options?: { fastMode?: boolean; maxDetectedFaces?: number }) => FaceDetectorInstance;
-async function cropPortraitFile(file: Blob, ratioName: string, outputName: string, beltUp = false): Promise<File> {
+async function cropPortraitFile(file: Blob, ratioName: string, outputName: string, fourButtonCrop = false): Promise<File> {
   const bitmap = await createImageBitmap(file);
   const ratio = frameRatios[ratioName] || frameRatios["4:5"];
   let sourceX = 0, sourceY = 0, sourceWidth = bitmap.width, sourceHeight = bitmap.height;
@@ -141,18 +141,18 @@ async function cropPortraitFile(file: Blob, ratioName: string, outputName: strin
     const desiredHeight = Math.min(
       bitmap.height,
       bitmap.width / ratio,
-      Math.max(box.height / 0.27, box.width / (0.34 * ratio)),
+      Math.max(box.height / 0.31, box.width / (0.38 * ratio)),
     );
     sourceHeight = desiredHeight;
     sourceWidth = desiredHeight * ratio;
     sourceX = Math.min(Math.max(0, box.x + box.width / 2 - sourceWidth / 2), bitmap.width - sourceWidth);
     sourceY = Math.min(Math.max(0, box.y - sourceHeight * 0.055), bitmap.height - sourceHeight);
-  } else if (beltUp) {
+  } else if (fourButtonCrop) {
     // Chromium does not expose FaceDetector on every Windows installation.
-    // Use a deterministic upper-body crop instead of silently keeping almost
-    // the full portrait: retain the top 80%, centre horizontally, and end at
-    // approximately the belt/waist on a conventional front-facing portrait.
-    sourceHeight = Math.min(bitmap.height * 0.8, bitmap.width / ratio);
+    // Use a deterministic upper-torso crop instead of retaining the full
+    // portrait. Keeping roughly the top 68% normally ends just below the four
+    // upper shirt buttons and excludes the belt, hands and lower body.
+    sourceHeight = Math.min(bitmap.height * 0.68, bitmap.width / ratio);
     sourceWidth = sourceHeight * ratio;
     sourceX = Math.max(0, (bitmap.width - sourceWidth) / 2);
     sourceY = 0;
@@ -397,7 +397,7 @@ async function generateShirtEdit() {
     if (ownVersion !== referenceVersion || source !== originalReference) return;
     replaceReferenceFile(edited);
     await prepareReference();
-    setShirtEditStatus(`Shirt edit ready in exact ${shirtAspectRatio.value} framing. It is now used by Connect, Apply reference and Save to extension.`, "success");
+    setShirtEditStatus(`Shirt edit ready in exact ${shirtAspectRatio.value} four-button framing. It is now used by Connect, Apply reference and Save to extension.`, "success");
   } catch (error) {
     if (ownVersion === referenceVersion) setShirtEditStatus(errorText(error, "Could not edit this reference image."), "error");
   } finally {
