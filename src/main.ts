@@ -146,9 +146,9 @@ async function cropPortraitFile(file: Blob, ratioName: string, outputName: strin
     sourceHeight = desiredHeight;
     sourceWidth = desiredHeight * ratio;
     sourceX = Math.min(Math.max(0, box.x + box.width / 2 - sourceWidth / 2), bitmap.width - sourceWidth);
-    // Keep only a small safety margin above the complete hair and move the
+    // Keep a balanced safety margin above the complete hair and move the
     // lower edge upward to the fourth shirt button.
-    sourceY = Math.min(Math.max(0, box.y - sourceHeight * 0.02), bitmap.height - sourceHeight);
+    sourceY = Math.min(Math.max(0, box.y - sourceHeight * 0.045), bitmap.height - sourceHeight);
   } else if (fourButtonCrop) {
     // Chromium does not expose FaceDetector on every Windows installation.
     // Use a deterministic upper-torso crop instead of retaining the full
@@ -157,7 +157,7 @@ async function cropPortraitFile(file: Blob, ratioName: string, outputName: strin
     sourceHeight = Math.min(bitmap.height * 0.68, bitmap.width / ratio);
     sourceWidth = sourceHeight * ratio;
     sourceX = Math.max(0, (bitmap.width - sourceWidth) / 2);
-    sourceY = Math.min(bitmap.height * 0.05, bitmap.height - sourceHeight);
+    sourceY = Math.min(bitmap.height * 0.03, bitmap.height - sourceHeight);
   } else if (sourceWidth / sourceHeight > ratio) {
     const croppedWidth = sourceHeight * ratio;
     sourceX = (sourceWidth - croppedWidth) / 2;
