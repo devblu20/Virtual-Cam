@@ -122,7 +122,7 @@ const frameRatios: Record<string, number> = { "4:5": 4 / 5, "3:4": 3 / 4, "1:1":
 type FaceDetectorResult = { boundingBox: { x: number; y: number; width: number; height: number } };
 type FaceDetectorInstance = { detect(source: ImageBitmap): Promise<FaceDetectorResult[]> };
 type FaceDetectorConstructor = new (options?: { fastMode?: boolean; maxDetectedFaces?: number }) => FaceDetectorInstance;
-async function cropPortraitFile(file: Blob, ratioName: string, outputName: string, fourButtonCrop = false): Promise<File> {
+async function cropPortraitFile(file: Blob, ratioName: string, outputName: string, fiveButtonCrop = false): Promise<File> {
   const bitmap = await createImageBitmap(file);
   const ratio = frameRatios[ratioName] || frameRatios["4:5"];
   let sourceX = 0, sourceY = 0, sourceWidth = bitmap.width, sourceHeight = bitmap.height;
@@ -141,20 +141,20 @@ async function cropPortraitFile(file: Blob, ratioName: string, outputName: strin
     const desiredHeight = Math.min(
       bitmap.height,
       bitmap.width / ratio,
-      Math.max(box.height / 0.31, box.width / (0.38 * ratio)),
+      Math.max(box.height / 0.295, box.width / (0.365 * ratio)),
     );
     sourceHeight = desiredHeight;
     sourceWidth = desiredHeight * ratio;
     sourceX = Math.min(Math.max(0, box.x + box.width / 2 - sourceWidth / 2), bitmap.width - sourceWidth);
-    // Leave visible breathing room above the complete hair while moving the
-    // lower edge upward toward the fourth shirt button.
-    sourceY = Math.min(Math.max(0, box.y - sourceHeight * 0.085), bitmap.height - sourceHeight);
-  } else if (fourButtonCrop) {
+    // Keep a compact margin above the complete hair while leaving enough
+    // lower-torso room to include the fifth shirt button.
+    sourceY = Math.min(Math.max(0, box.y - sourceHeight * 0.04), bitmap.height - sourceHeight);
+  } else if (fiveButtonCrop) {
     // Chromium does not expose FaceDetector on every Windows installation.
     // Use a deterministic upper-torso crop instead of retaining the full
-    // portrait. Keeping roughly the top 68% normally ends just below the four
+    // portrait. Keeping roughly the top 74% normally ends just below the five
     // upper shirt buttons and excludes the belt, hands and lower body.
-    sourceHeight = Math.min(bitmap.height * 0.68, bitmap.width / ratio);
+    sourceHeight = Math.min(bitmap.height * 0.74, bitmap.width / ratio);
     sourceWidth = sourceHeight * ratio;
     sourceX = Math.max(0, (bitmap.width - sourceWidth) / 2);
     sourceY = 0;
@@ -399,7 +399,7 @@ async function generateShirtEdit() {
     if (ownVersion !== referenceVersion || source !== originalReference) return;
     replaceReferenceFile(edited);
     await prepareReference();
-    setShirtEditStatus(`Shirt edit ready in exact ${shirtAspectRatio.value} four-button framing. It is now used by Connect, Apply reference and Save to extension.`, "success");
+    setShirtEditStatus(`Shirt edit ready in exact ${shirtAspectRatio.value} five-button framing. It is now used by Connect, Apply reference and Save to extension.`, "success");
   } catch (error) {
     if (ownVersion === referenceVersion) setShirtEditStatus(errorText(error, "Could not edit this reference image."), "error");
   } finally {
