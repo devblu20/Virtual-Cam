@@ -122,7 +122,7 @@ const frameRatios: Record<string, number> = { "4:5": 4 / 5, "3:4": 3 / 4, "1:1":
 type FaceDetectorResult = { boundingBox: { x: number; y: number; width: number; height: number } };
 type FaceDetectorInstance = { detect(source: ImageBitmap): Promise<FaceDetectorResult[]> };
 type FaceDetectorConstructor = new (options?: { fastMode?: boolean; maxDetectedFaces?: number }) => FaceDetectorInstance;
-async function cropPortraitFile(file: Blob, ratioName: string, outputName: string): Promise<File> {
+async function cropPortraitFile(file: Blob, ratioName: string, outputName: string, beltUp = false): Promise<File> {
   const bitmap = await createImageBitmap(file);
   const ratio = frameRatios[ratioName] || frameRatios["4:5"];
   let sourceX = 0, sourceY = 0, sourceWidth = bitmap.width, sourceHeight = bitmap.height;
@@ -141,12 +141,21 @@ async function cropPortraitFile(file: Blob, ratioName: string, outputName: strin
     const desiredHeight = Math.min(
       bitmap.height,
       bitmap.width / ratio,
-      Math.max(box.height / 0.2, box.width / (0.28 * ratio)),
+      Math.max(box.height / 0.27, box.width / (0.34 * ratio)),
     );
     sourceHeight = desiredHeight;
     sourceWidth = desiredHeight * ratio;
     sourceX = Math.min(Math.max(0, box.x + box.width / 2 - sourceWidth / 2), bitmap.width - sourceWidth);
-    sourceY = Math.min(Math.max(0, box.y - sourceHeight * 0.1), bitmap.height - sourceHeight);
+    sourceY = Math.min(Math.max(0, box.y - sourceHeight * 0.055), bitmap.height - sourceHeight);
+  } else if (beltUp) {
+    // Chromium does not expose FaceDetector on every Windows installation.
+    // Use a deterministic upper-body crop instead of silently keeping almost
+    // the full portrait: retain the top 80%, centre horizontally, and end at
+    // approximately the belt/waist on a conventional front-facing portrait.
+    sourceHeight = Math.min(bitmap.height * 0.8, bitmap.width / ratio);
+    sourceWidth = sourceHeight * ratio;
+    sourceX = Math.max(0, (bitmap.width - sourceWidth) / 2);
+    sourceY = 0;
   } else if (sourceWidth / sourceHeight > ratio) {
     const croppedWidth = sourceHeight * ratio;
     sourceX = (sourceWidth - croppedWidth) / 2;
@@ -356,7 +365,7 @@ async function generateShirtEdit() {
   let timer = 0;
   try {
     const upload = shirtFraming.value === "auto"
-      ? await cropPortraitFile(source, shirtAspectRatio.value, "prepared-reference.jpg")
+      ? await cropPortraitFile(source, shirtAspectRatio.value, "prepared-reference.jpg", true)
       : source;
     setShirtEditStatus("Editing clothing… 0s", "working");
     timer = window.setInterval(() => {
