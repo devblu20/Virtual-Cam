@@ -122,33 +122,65 @@ const frameRatios: Record<string, number> = { "4:5": 4 / 5, "3:4": 3 / 4, "1:1":
 type FaceDetectorResult = { boundingBox: { x: number; y: number; width: number; height: number } };
 type FaceDetectorInstance = { detect(source: ImageBitmap): Promise<FaceDetectorResult[]> };
 type FaceDetectorConstructor = new (options?: { fastMode?: boolean; maxDetectedFaces?: number }) => FaceDetectorInstance;
+let mediaPipeFaceDetector: Promise<import("@mediapipe/tasks-vision").FaceDetector> | null = null;
+
+async function detectLargestFace(bitmap: ImageBitmap): Promise<FaceDetectorResult | undefined> {
+  const NativeDetector = (window as unknown as { FaceDetector?: FaceDetectorConstructor }).FaceDetector;
+  if (NativeDetector) {
+    try {
+      const faces = await new NativeDetector({ fastMode: true, maxDetectedFaces: 1 }).detect(bitmap);
+      const face = faces.sort((left, right) =>
+        right.boundingBox.width * right.boundingBox.height - left.boundingBox.width * left.boundingBox.height,
+      )[0];
+      if (face) return face;
+    } catch { /* Use the bundled detector below. */ }
+  }
+
+  try {
+    mediaPipeFaceDetector ??= (async () => {
+      const { FaceDetector, FilesetResolver } = await import("@mediapipe/tasks-vision");
+      const vision = await FilesetResolver.forVisionTasks("/mediapipe/wasm");
+      return FaceDetector.createFromOptions(vision, {
+        baseOptions: { modelAssetPath: "/mediapipe/face_detector.tflite" },
+        runningMode: "IMAGE",
+        minDetectionConfidence: 0.45,
+      });
+    })();
+    const detector = await mediaPipeFaceDetector;
+    const detection = detector.detect(bitmap).detections.sort((left, right) => {
+      const leftBox = left.boundingBox;
+      const rightBox = right.boundingBox;
+      return (rightBox?.width || 0) * (rightBox?.height || 0) -
+        (leftBox?.width || 0) * (leftBox?.height || 0);
+    })[0];
+    const box = detection?.boundingBox;
+    if (box) {
+      return { boundingBox: { x: box.originX, y: box.originY, width: box.width, height: box.height } };
+    }
+  } catch {
+    mediaPipeFaceDetector = null;
+  }
+  return undefined;
+}
+
 async function cropPortraitFile(file: Blob, ratioName: string, outputName: string, fourButtonCrop = false): Promise<File> {
   const bitmap = await createImageBitmap(file);
   const ratio = frameRatios[ratioName] || frameRatios["4:5"];
   let sourceX = 0, sourceY = 0, sourceWidth = bitmap.width, sourceHeight = bitmap.height;
-  const Detector = (window as unknown as { FaceDetector?: FaceDetectorConstructor }).FaceDetector;
-  let face: FaceDetectorResult | undefined;
-  if (Detector) {
-    try {
-      const faces = await new Detector({ fastMode: true, maxDetectedFaces: 1 }).detect(bitmap);
-      face = faces.sort((left, right) =>
-        right.boundingBox.width * right.boundingBox.height - left.boundingBox.width * left.boundingBox.height,
-      )[0];
-    } catch { /* Ratio-only fallback keeps auto framing available. */ }
-  }
+  const face = fourButtonCrop ? await detectLargestFace(bitmap) : undefined;
   if (face) {
     const box = face.boundingBox;
     const desiredHeight = Math.min(
       bitmap.height,
       bitmap.width / ratio,
-      Math.max(box.height / 0.31, box.width / (0.38 * ratio)),
+      Math.max(box.height / 0.30, box.width / (0.36 * ratio)),
     );
     sourceHeight = desiredHeight;
     sourceWidth = desiredHeight * ratio;
     sourceX = Math.min(Math.max(0, box.x + box.width / 2 - sourceWidth / 2), bitmap.width - sourceWidth);
-    // Keep a balanced safety margin above the complete hair and move the
-    // lower edge upward to the fourth shirt button.
-    sourceY = Math.min(Math.max(0, box.y - sourceHeight * 0.045), bitmap.height - sourceHeight);
+    // Scale both headroom and the lower edge from the detected face, so close
+    // portraits and full-body photos produce the same four-button composition.
+    sourceY = Math.min(Math.max(0, box.y - box.height * 0.34), bitmap.height - sourceHeight);
   } else if (fourButtonCrop) {
     // Chromium does not expose FaceDetector on every Windows installation.
     // Use a deterministic upper-torso crop instead of retaining the full
@@ -194,21 +226,13 @@ async function restoreOriginalHead(edited: Blob, originalCrop: Blob, outputName:
   let centreY = height * 0.3;
   let radiusX = width * 0.2;
   let radiusY = height * 0.235;
-  const Detector = (window as unknown as { FaceDetector?: FaceDetectorConstructor }).FaceDetector;
-  if (Detector) {
-    try {
-      const faces = await new Detector({ fastMode: false, maxDetectedFaces: 1 }).detect(originalBitmap);
-      const face = faces.sort((left, right) =>
-        right.boundingBox.width * right.boundingBox.height - left.boundingBox.width * left.boundingBox.height,
-      )[0];
-      if (face) {
-        const box = face.boundingBox;
-        centreX = (box.x + box.width / 2) * scaleX;
-        centreY = (box.y + box.height * 0.38) * scaleY;
-        radiusX = box.width * scaleX * 0.76;
-        radiusY = box.height * scaleY * 0.94;
-      }
-    } catch { /* Stable portrait-position fallback below. */ }
+  const face = await detectLargestFace(originalBitmap);
+  if (face) {
+    const box = face.boundingBox;
+    centreX = (box.x + box.width / 2) * scaleX;
+    centreY = (box.y + box.height * 0.38) * scaleY;
+    radiusX = box.width * scaleX * 0.76;
+    radiusY = box.height * scaleY * 0.94;
   }
 
   const canvas = document.createElement("canvas");
