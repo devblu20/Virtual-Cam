@@ -7,7 +7,7 @@ button { cursor: pointer; }
 :focus-visible { outline: 3px solid #93b4ff; outline-offset: 2px; }
 .ledger-shell { min-height: 100vh; }
 .login-view { display: grid; grid-template-columns: minmax(540px, 1.08fr) minmax(420px, .92fr); min-height: 100vh; overflow: hidden; background: linear-gradient(116deg, #fff 0 59%, #f1f5ff 59%); }
-.login-showcase { position: relative; display: flex; min-height: 100vh; padding: 34px 5.5vw 30px 4.5vw; flex-direction: column; justify-content: center; overflow: hidden; }
+.login-showcase { position: relative; display: flex; min-height: 100vh; padding: 118px 4.5vw 28px; flex-direction: column; justify-content: flex-start; overflow: hidden; }
 .login-showcase::before { position: absolute; width: 430px; height: 430px; right: 6%; bottom: -230px; border-radius: 50%; background: #eaf0ff; content: ""; }
 .login-showcase::after { position: absolute; width: 130px; height: 130px; right: 16%; top: 13%; border: 1px solid #dce6ff; border-radius: 50%; content: ""; }
 .login-brand { position: absolute; z-index: 1; display: flex; align-items: center; gap: 14px; left: 4.5vw; top: 30px; }
@@ -15,10 +15,10 @@ button { cursor: pointer; }
 .login-brand div, .wordmark div { display: grid; gap: 2px; }
 .login-brand b { font-size: 20px; }
 .login-brand small, .wordmark small { color: #7d899d; font-size: 9px; font-weight: 800; letter-spacing: .18em; }
-.showcase-copy { position: relative; z-index: 1; width: min(780px, 96%); margin-top: 34px; }
-.showcase-copy h2 { margin: 0; color: #111b2d; font-size: clamp(42px, 4.25vw, 64px); line-height: 1; letter-spacing: -.06em; }
-.showcase-copy > p:last-child { width: min(540px, 94%); margin: 18px 0 0; color: #68768c; font-size: 14px; line-height: 1.65; }
-.schedule-preview { position: relative; z-index: 1; width: min(790px, 96%); margin-top: 26px; padding: 20px; border: 1px solid #dfe6f0; border-radius: 18px; background: rgba(255,255,255,.96); box-shadow: 0 18px 48px rgba(34, 61, 106, .1); backdrop-filter: blur(10px); }
+.showcase-copy { position: relative; z-index: 1; width: min(760px, 96%); margin-top: 0; }
+.showcase-copy h2 { margin: 0; color: #111b2d; font-size: clamp(42px, 3.7vw, 56px); line-height: 1.02; letter-spacing: -.055em; }
+.showcase-copy > p:last-child { width: min(590px, 94%); margin: 16px 0 0; color: #68768c; font-size: 14px; line-height: 1.6; }
+.schedule-preview { position: relative; z-index: 1; width: min(760px, 96%); margin-top: 22px; padding: 18px; border: 1px solid #dfe6f0; border-radius: 18px; background: rgba(255,255,255,.97); box-shadow: 0 18px 48px rgba(34, 61, 106, .1); backdrop-filter: blur(10px); }
 .preview-head, .preview-head > div, .preview-row { display: flex; align-items: center; }
 .preview-head { justify-content: space-between; padding: 0 2px 14px; border-bottom: 1px solid #edf0f5; }
 .preview-head > div { gap: 8px; }
@@ -38,7 +38,7 @@ button { cursor: pointer; }
 .preview-stats small { color: #8491a4; font-size: 8px; }
 .sheet-icon.mini { width: 26px; height: 26px; border-radius: 7px; font-size: 13px; }
 .mini-sheet { margin-top: 14px; overflow: hidden; border: 1px solid #dfe5ee; border-radius: 11px; }
-.mini-sheet-row { display: grid; grid-template-columns: 36px 1.7fr .85fr .95fr .8fr .75fr; align-items: center; min-height: 49px; border-bottom: 1px solid #e6ebf2; background: #fff; color: #566378; font-size: 9px; }
+.mini-sheet-row { display: grid; grid-template-columns: 36px 1.7fr .85fr .95fr .8fr .75fr; align-items: center; min-height: 44px; border-bottom: 1px solid #e6ebf2; background: #fff; color: #566378; font-size: 9px; }
 .mini-sheet-row:last-child { border-bottom: 0; }
 .mini-sheet-row > span { display: flex; min-width: 0; height: 100%; align-items: center; gap: 8px; overflow: hidden; padding: 8px 9px; border-right: 1px solid #e6ebf2; text-overflow: ellipsis; white-space: nowrap; }
 .mini-sheet-row > span:last-child { border-right: 0; }
@@ -56,7 +56,7 @@ button { cursor: pointer; }
 .sheet-tabs span { padding: 7px 10px; border-radius: 7px; }
 .sheet-tabs .active { background: #e9f6ee; color: #187c48; font-weight: 800; }
 .sheet-tabs strong { margin-left: auto; color: #176f42; font-size: 8px; }
-.showcase-points { position: relative; z-index: 1; display: flex; gap: 18px; margin-top: 18px; color: #657389; font-size: 9px; font-weight: 700; }
+.showcase-points { position: relative; z-index: 1; display: flex; gap: 22px; margin-top: 15px; color: #657389; font-size: 9px; font-weight: 700; }
 .showcase-points span::first-letter { color: #1e5eff; }
 .login-card { position: relative; width: min(440px, calc(100% - 48px)); margin: auto; overflow: hidden; padding: 44px; border: 1px solid #dce4f0; border-radius: 24px; background: #fff; box-shadow: 0 30px 90px rgba(40, 68, 115, .14); }
 .login-card::before { position: absolute; height: 5px; inset: 0 0 auto; background: linear-gradient(90deg, #1e5eff, #7b61ff, #ef6b91); content: ""; }
