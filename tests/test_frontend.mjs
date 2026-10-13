@@ -14,7 +14,7 @@ const source = usageSource + "\n" + readFileSync(new URL("../src/main.ts", impor
   .replace('import { UsageReporter, referenceMetadata } from "./usage";', "");
 const compiled = (await transformWithOxc(source, "main.ts")).code.replace(/export\s*\{\s*\};?/g, "");
 const extensionProfile = JSON.parse(readFileSync(new URL("./fixtures/bluqq-0.3.8-video-profile.json", import.meta.url), "utf8"));
-const processingConfig = { schemaVersion: 1, prompt: 'Test prompt supplied only by Railway', revision: 'a'.repeat(64) };
+const processingConfig = { schemaVersion: 2, prompt: 'Test prompt supplied only by Railway', revision: 'a'.repeat(64), userId: 'krishna', displayName: 'Krishna', model:'lucy-2.1', enhance:false };
 
 function media() {
   const track = { stopped: false, settings: { width: 1280, height: 720, frameRate: 30 }, listeners: {}, stop() { this.stopped = true; },
@@ -278,7 +278,7 @@ test("website uses Bluqq branding without editable prompt controls", () => {
   assert.doesNotMatch(html, /id="(?:promptInput|enhanceInput)"/);
   assert.match(html, /agree to send my camera video, reference image, and Bluqq's server-provided prompt/);
   assert.match(html, /AI-generated video/);
-  assert.match(html, /Bluqq extension 0\.3\.8 · Lucy 2\.1/);
+  assert.match(html, /extension 0\.4\.1 compatible · Lucy 2\.1/);
   assert.doesNotMatch(html, /id="(?:modelSelect|resolutionSelect)"/);
   assert.match(html, /upload the same portrait/);
 });
@@ -287,10 +287,12 @@ test("server prompt is pinned for connection and reference updates without enhan
   const h = harness();
   try {
     await h.click("cameraButton");
+    h.el("transformationPrompt").value = "Stale prompt from another account";
     await h.click("connectButton");
     const initial = h.calls.decart[0][1].initialState.prompt;
     assert.equal(initial.text, processingConfig.prompt);
-    assert.equal(JSON.parse(h.calls.fetch[0][1].body).processingConfigVersion, 1);
+    assert.match(h.el("promptStatus").textContent, /Krishna/);
+    assert.equal(JSON.parse(h.calls.fetch[0][1].body).processingConfigVersion, 2);
     assert.equal(initial.enhance, false);
     assert.equal(h.calls.decart[0][1].initialState.image, h.el("referenceInput").files[0]);
     assert.match(h.el("referenceState").textContent, /Reference applied/);
@@ -303,7 +305,7 @@ test("server prompt is pinned for connection and reference updates without enhan
 });
 
 test("missing Railway prompt cannot fall back to a bundled instruction", async () => {
-  for (const config of [undefined, { ...processingConfig, schemaVersion: 2 }, { ...processingConfig, prompt: '' }]) {
+  for (const config of [undefined, { ...processingConfig, schemaVersion: 1 }, { ...processingConfig, prompt: '' }, {...processingConfig,prompt:'x'.repeat(1025)}]) {
     const h = harness();
     try {
       h.hooks.fetch = async () => ({ ok: true, json: async () => ({ apiKey: 'test', processingConfig: config }) });
@@ -556,7 +558,7 @@ test("diagnostics report real received dimensions and ignore stale network callb
     h.el("outputVideo").videoWidth = 1280;
     h.el("outputVideo").videoHeight = 720;
     h.el("outputVideo").listeners.resize();
-    assert.match(h.el("outputDetails").textContent, /Received: 1280 × 720 · Bluqq extension 0\.3\.8 profile/);
+    assert.match(h.el("outputDetails").textContent, /Received: 1280 × 720 · Lucy 2\.1/);
     assert.equal(h.el("outputDetails").dataset.tone, "idle");
     h.el("outputVideo").videoWidth = 640;
     h.el("outputVideo").videoHeight = 360;

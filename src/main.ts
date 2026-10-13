@@ -4,18 +4,21 @@ import { UsageReporter, referenceMetadata } from "./usage";
 
 // Video profile from the supplied Bluqq ZIP (manifest version 0.3.8).
 // Keep initial connections and reference updates aligned. See EXTENSION_PARITY.md.
-// The only editable prompt lives in transformation_prompt.txt on Railway.
+// Personal prompts are assigned by access-key user ID on Railway.
 // Every new connection receives a validated, session-pinned text configuration.
-type ProcessingConfig = { schemaVersion: 1; prompt: string; revision: string };
+type ProcessingConfig = { schemaVersion: 2; prompt: string; revision: string; userId: string; displayName: string; model: string; enhance: false };
 let sessionPrompt: string | null = null;
 function processingConfig(value: unknown): ProcessingConfig {
   const config = value as Partial<ProcessingConfig> | null;
-  if (!config || config.schemaVersion !== 1 || typeof config.prompt !== "string" ||
-      !config.prompt.trim() || config.prompt.length > 4000 ||
+  if (!config || config.schemaVersion !== 2 || typeof config.prompt !== "string" ||
+      !config.prompt.trim() || config.prompt.length > 1024 ||
+      typeof config.userId !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(config.userId) ||
+      typeof config.displayName !== "string" || config.displayName.length > 80 ||
+      config.model !== "lucy-2.1" || config.enhance !== false ||
       typeof config.revision !== "string" || !/^[a-f0-9]{64}$/.test(config.revision)) {
     throw new Error("Railway did not provide a valid processing prompt. Deploy the updated backend, then reconnect.");
   }
-  return { schemaVersion: 1, prompt: config.prompt, revision: config.revision };
+  return { schemaVersion: 2, prompt: config.prompt, revision: config.revision, userId: config.userId, displayName: config.displayName, model: config.model, enhance: false };
 }
 const EXTENSION_MODEL = "lucy-2.1";
 const CAMERA_FPS = 25;
@@ -398,7 +401,7 @@ function updateOutputDetails() {
   const target = model();
   const belowTarget = !!(width && height && width * height < target.width * target.height);
   outputDetails.textContent = width && height
-    ? `Received: ${width} × ${height} · Bluqq extension 0.3.8 profile${belowTarget ? " — lower pixel count than the model input; inspect output detail." : ""}`
+    ? `Received: ${width} × ${height} · Lucy 2.1${belowTarget ? " — lower pixel count than the model input; inspect output detail." : ""}`
     : "Output: provider default, matching the extension · Waiting for decoded video dimensions…";
   outputDetails.dataset.tone = belowTarget ? "warning" : "idle";
 }
@@ -475,6 +478,8 @@ function syncControls() {
 
 async function loadDefaultPrompt() {
   if (busy || connection) return;
+  const requestedKey = accessKey.value.trim();
+  const requestedVersion = version;
   if (accessKey.value.trim().length < 32) {
     setPromptStatus("Enter your Bluqq personal access key first.", "error");
     return;
@@ -482,18 +487,21 @@ async function loadDefaultPrompt() {
   loadPromptButton.disabled = true;
   setPromptStatus("Loading the current Railway prompt…", "working");
   try {
-    const response = await fetch("/api/processing-config", {
-      headers: { Authorization: "Bearer " + accessKey.value.trim() },
+    const response = await fetch("/api/client-config", {
+      headers: { Authorization: "Bearer " + requestedKey },
       cache: "no-store", credentials: "omit", redirect: "error",
+      signal: AbortSignal.timeout(15000),
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(errorText(payload, "Could not load the default prompt."));
     const config = processingConfig(payload);
+    if (accessKey.value.trim() !== requestedKey || version !== requestedVersion || busy || connection) return;
     loadedDefaultPrompt = config.prompt;
     transformationPrompt.value = config.prompt;
     resetPromptButton.disabled = false;
-    setPromptStatus("Default prompt loaded. Edit it before connecting, or leave it unchanged.", "success");
+    setPromptStatus(`Assigned prompt for ${config.displayName}. A fresh copy is fetched when you connect.`, "success");
   } catch (error) {
+    if (accessKey.value.trim() !== requestedKey || version !== requestedVersion || busy || connection) return;
     setPromptStatus(errorText(error, "Could not load the default prompt."), "error");
   } finally {
     syncControls();
@@ -660,7 +668,7 @@ async function fetchToken(signal: AbortSignal, reporter: UsageReporter, referenc
   const response = await fetch("/api/realtime-token", {
     method: "POST",
     headers: { Authorization: "Bearer " + accessKey.value.trim(), "Content-Type": "application/json" },
-    body: JSON.stringify({ processingConfigVersion: 1, usage: { source: "website", platform: "website", version: "usage-v2", avatar } }),
+    body: JSON.stringify({ processingConfigVersion: 2, usage: { source: "website", platform: "website", version: "managed-prompts-0.4.1", avatar } }),
     cache: "no-store", credentials: "omit", redirect: "error",
     signal,
   });
@@ -706,7 +714,10 @@ async function connect() {
   try {
     const token = await fetchToken(abort.signal, reporter, reference);
     if (ownVersion !== version) return;
-    const effectivePrompt = transformationPrompt.value.trim() || token.config.prompt;
+    const effectivePrompt = token.config.prompt;
+    transformationPrompt.value = effectivePrompt;
+    loadedDefaultPrompt = effectivePrompt;
+    setPromptStatus(`Using assigned prompt for ${token.config.displayName} · revision ${token.config.revision.slice(0,12)}. Changes apply after reconnecting.`, "success");
     const client = createDecartClient({
       apiKey: token.apiKey,
       telemetry: false,
@@ -809,6 +820,11 @@ shirtFraming.addEventListener("change", syncControls);
 loadPromptButton.addEventListener("click", () => void loadDefaultPrompt());
 resetPromptButton.addEventListener("click", resetTransformationPrompt);
 accessKey.addEventListener("input", () => {
+  if (!busy && !connection) {
+    loadedDefaultPrompt = "";
+    transformationPrompt.value = "";
+    setPromptStatus("Connect or view the assigned prompt for this key.");
+  }
   if (shirtEditStatus.textContent?.trim() === "[redacted]") {
     setShirtEditStatus("Personal key updated. Press Generate shirt edit again.");
   }
