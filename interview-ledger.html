@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <meta name="description" content="Bluqq Interview Ledger — a clean interview schedule and Excel workspace." />
+    <title>Interview Ledger | Bluqq</title>
+  </head>
+  <body>
+    <main class="ledger-shell">
+      <section class="login-view" id="loginView">
+        <div class="login-showcase">
+          <div class="login-brand"><span>b.</span><div><b>Bluqq</b><small>INTERVIEW LEDGER</small></div></div>
+          <div class="showcase-copy">
+            <p class="kicker">SMART INTERVIEW OPERATIONS</p>
+            <h2>Every candidate.<br />One clear schedule.</h2>
+            <p>Keep interview details, candidate photos and résumés organised in a private workspace built for fast hiring days.</p>
+          </div>
+          <div class="schedule-preview" aria-hidden="true">
+            <div class="preview-head"><div><span class="sheet-icon mini">▦</span><b>Interview data</b></div><small>EXCEL-STYLE REGISTER</small></div>
+            <div class="mini-sheet">
+              <div class="mini-sheet-row mini-sheet-head"><span>#</span><span>Candidate</span><span>Date</span><span>Start</span><span>Duration</span><span>Résumé</span></div>
+              <div class="mini-sheet-row"><span>1</span><span><i class="mini-avatar blue">C1</i><b>Candidate 01</b></span><span>14 Oct</span><span>10:30 AM</span><span>30 min</span><span><em>↓ PDF</em></span></div>
+              <div class="mini-sheet-row"><span>2</span><span><i class="mini-avatar purple">C2</i><b>Candidate 02</b></span><span>14 Oct</span><span>12:15 PM</span><span>45 min</span><span><em>↓ PDF</em></span></div>
+              <div class="mini-sheet-row"><span>3</span><span><i class="mini-avatar green">C3</i><b>Candidate 03</b></span><span>15 Oct</span><span>03:00 PM</span><span>30 min</span><span><em>↓ PDF</em></span></div>
+              <div class="mini-sheet-row"><span>4</span><span><i class="mini-avatar coral">C4</i><b>Candidate 04</b></span><span>16 Oct</span><span>11:00 AM</span><span>1 hr</span><span><em>↓ PDF</em></span></div>
+              <div class="mini-sheet-row"><span>5</span><span><i class="mini-avatar navy">C5</i><b>Candidate 05</b></span><span>16 Oct</span><span>02:30 PM</span><span>45 min</span><span><em>↓ PDF</em></span></div>
+            </div>
+            <div class="sheet-tabs"><span class="active">▦ Interviews</span><span>＋ Add record</span><strong>Download .xlsx ↗</strong></div>
+          </div>
+          <div class="showcase-points"><span>✓ Excel-ready records</span><span>✓ Private file storage</span><span>✓ Fast schedule updates</span></div>
+        </div>
+        <div class="login-card">
+          <p class="kicker">PRIVATE WORKSPACE</p>
+          <h1>Your interviews,<br />beautifully organised.</h1>
+          <p class="login-copy">Sign in to manage candidates and keep every schedule ready for Excel.</p>
+          <form id="loginForm">
+            <label>Workspace ID<input id="portalId" type="text" autocomplete="username" placeholder="Enter workspace ID" required /></label>
+            <label>Password<input id="portalPassword" type="password" autocomplete="current-password" placeholder="Enter password" required /></label>
+            <button class="primary wide" type="submit">Open Interview Ledger <span>→</span></button>
+            <p class="message" id="loginMessage" aria-live="polite"></p>
+          </form>
+          <p class="security-note">Credentials remain only in this tab and are never saved in browser storage.</p>
+        </div>
+      </section>
+
+      <section class="ledger-view" id="ledgerView" hidden>
+        <header class="topbar">
+          <div class="wordmark"><span>b.</span><div><b>Interview Ledger</b><small>BY BLUQQ</small></div></div>
+          <div class="top-actions"><button class="quiet" id="logoutButton" type="button">Log out</button><button class="primary" id="newInterviewButton" type="button">＋ New interview</button></div>
+        </header>
+        <section class="hero-row">
+          <div><p class="kicker">INTERVIEW OPERATIONS</p><h1>Candidate schedule</h1><p>One workspace for every upcoming conversation.</p></div>
+          <div class="hero-actions"><button class="outline" id="refreshButton" type="button">↻ Refresh</button><button class="excel-button" id="excelButton" type="button">▦ Download Excel</button></div>
+        </section>
+        <section class="stat-row">
+          <article><small>Total interviews</small><strong id="totalCount">0</strong></article>
+          <article><small>Upcoming</small><strong id="upcomingCount">0</strong></article>
+          <article><small>Total interview time</small><strong id="totalMinutes">0 min</strong></article>
+        </section>
+        <section class="sheet-card">
+          <div class="sheet-toolbar"><div><span class="sheet-icon">▦</span><div><b>Interview data</b><small>Live Excel-style register</small></div></div><label class="search-box">⌕<input id="searchInput" type="search" placeholder="Search candidates" /></label></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th class="row-number">#</th><th class="candidate-column">Candidate</th><th>Interview date</th><th>Start time</th><th>Duration</th><th>Résumé</th><th class="actions-column">Actions</th></tr></thead>
+              <tbody id="ledgerRows"></tbody>
+            </table>
+          </div>
+          <div class="empty-state" id="emptyState"><span>＋</span><h2>No interviews yet</h2><p>Add the first candidate to begin your interview ledger.</p><button class="primary" id="emptyAddButton" type="button">Add interview</button></div>
+          <p class="sheet-message" id="sheetMessage" aria-live="polite"></p>
+        </section>
+        <footer>Private Interview Ledger · A product by <strong>Bluqq</strong></footer>
+      </section>
+    </main>
+
+    <dialog id="interviewDialog">
+      <form class="dialog-card" id="ledgerForm" method="dialog">
+        <div class="dialog-heading"><div><p class="kicker" id="dialogKicker">NEW RECORD</p><h2 id="dialogTitle">Add an interview</h2><p id="dialogDescription">Candidate details will appear as a new row in your ledger.</p></div><button class="close-button" id="closeDialogButton" type="button" aria-label="Close">×</button></div>
+        <div class="form-grid">
+          <label class="full">Candidate name<input id="ledgerName" type="text" maxlength="100" placeholder="Full name" required /></label>
+          <label>Interview date<input id="ledgerDate" type="date" required /></label>
+          <label>Start time<input id="ledgerTime" type="time" required /></label>
+          <label>Duration<select id="ledgerDuration" required><option value="">Choose duration</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60">1 hour</option><option value="90">1 hour 30 minutes</option><option value="120">2 hours</option><option value="150">2 hours 30 minutes</option><option value="180">3 hours</option><option value="240">4 hours</option><option value="custom">Other</option></select></label>
+          <label id="customDurationLabel" hidden>Custom duration (minutes)<input id="customDuration" type="number" min="1" max="720" step="1" inputmode="numeric" placeholder="Example: 75" /></label>
+          <label class="file-field">Candidate photo<input id="ledgerPhoto" type="file" accept="image/jpeg,image/png,image/webp" required /><small id="photoHelp">JPG, PNG or WebP · max 10 MB</small></label>
+          <label class="file-field">Résumé<input id="ledgerResume" type="file" accept=".pdf,.doc,.docx" required /><small id="resumeHelp">PDF, DOC or DOCX · max 10 MB</small></label>
+        </div>
+        <label class="consent"><input id="ledgerConsent" type="checkbox" required /><span>I have permission to store this candidate’s information and files.</span></label>
+        <p class="message" id="dialogMessage" aria-live="polite"></p>
+        <div class="dialog-actions"><button class="quiet" id="cancelDialogButton" type="button">Cancel</button><button class="primary" id="submitInterviewButton" type="submit">Save to ledger</button></div>
+      </form>
+    </dialog>
+    <script type="module" src="/src/interview-ledger.ts"></script>
+  </body>
+</html>

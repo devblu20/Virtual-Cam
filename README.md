@@ -55,6 +55,7 @@ Decart key. Do not put any raw key in GitHub, extension code, screenshots or CI 
 2. Choose this repository. Railway uses the included Dockerfile.
 3. Under service Variables, add:
    - DECART_API_KEY: your real Decart server API key.
+   - OPENROUTER_API_KEY: your OpenRouter server API key for optional reference shirt editing.
    - VCAM_ACCESS_KEYS: the JSON object printed by the helper above.
 4. Apply the variables and deploy/redeploy. If automatic deployment ran before
    the variables were set, its health check will fail until these are configured.
@@ -65,6 +66,9 @@ Decart key. Do not put any raw key in GitHub, extension code, screenshots or CI 
 7. Open /api/health on that domain. Expected: HTTP 200 and configured: true.
 8. Open the website, enter your personal access key, choose a reference image,
    agree to processing, Start camera, then Connect and transform.
+   The optional clothing editor appears below the reference preview. It uses
+   OpenRouter only when Generate shirt edit is pressed; choosing a reference and
+   connecting without pressing it preserves the original Virtual CAM workflow.
 9. Stop when finished. Transformation uses paid Decart service.
 
 PORT is supplied by Railway. Do not hardcode localhost or port 5173 in Railway.

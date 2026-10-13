@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="description" content="Prepare candidate details and interview timing in Bluqq Interview Studio." />
+    <title>Interview Setup | Bluqq</title>
+  </head>
+  <body>
+    <main class="interview-shell">
+      <header class="interview-header">
+        <a class="brand-lockup" href="/" aria-label="Back to Virtual CAM">
+          <span class="brand-symbol" aria-hidden="true">b.</span>
+          <span>
+            <small>BLUQQ INTERVIEW STUDIO</small>
+            <strong>Interview Setup</strong>
+            <em>A product by <b>Bluqq</b></em>
+          </span>
+        </a>
+        <a class="back-link" href="/">← Virtual CAM</a>
+      </header>
+
+      <section class="page-intro">
+        <div>
+          <p class="eyebrow">PLAN THE CONVERSATION</p>
+          <h1>Set up an interview.</h1>
+          <p>Add the candidate, schedule, photo and résumé in one clear workspace.</p>
+        </div>
+        <span class="draft-pill"><i></i> New interview</span>
+      </section>
+
+      <div class="workspace-grid">
+        <form class="setup-card" id="interviewForm" novalidate>
+          <section class="form-section access-section">
+            <div class="section-heading">
+              <span>00</span>
+              <div><h2>Private access</h2><p>Use your Virtual CAM personal key to save and retrieve interviews.</p></div>
+            </div>
+            <div class="key-row">
+              <label class="field" for="accessKey">
+                <span>Personal access key</span>
+                <input id="accessKey" name="accessKey" type="password" autocomplete="off" spellcheck="false" placeholder="Enter your Bluqq personal key" required />
+                <small class="field-error" id="keyError"></small>
+              </label>
+              <button class="secondary load-button" id="loadInterviewsButton" type="button">Load saved</button>
+            </div>
+          </section>
+          <section class="form-section">
+            <div class="section-heading">
+              <span>01</span>
+              <div><h2>Candidate details</h2><p>Who is this interview for?</p></div>
+            </div>
+            <label class="field field-wide" for="candidateName">
+              <span>Full name</span>
+              <input id="candidateName" name="candidateName" type="text" maxlength="100" autocomplete="name" placeholder="Enter candidate name" required />
+              <small class="field-error" id="nameError"></small>
+            </label>
+          </section>
+
+          <section class="form-section">
+            <div class="section-heading">
+              <span>02</span>
+              <div><h2>Schedule</h2><p>Choose the date, start time and duration.</p></div>
+            </div>
+            <div class="field-grid three-columns">
+              <label class="field" for="interviewDate">
+                <span>Interview date</span>
+                <input id="interviewDate" name="interviewDate" type="date" required />
+                <small class="field-error" id="dateError"></small>
+              </label>
+              <label class="field" for="startTime">
+                <span>Start time</span>
+                <input id="startTime" name="startTime" type="time" required />
+                <small class="field-error" id="timeError"></small>
+              </label>
+              <label class="field" for="duration">
+                <span>Interview duration</span>
+                <select id="duration" name="duration" required>
+                  <option value="">Select duration</option>
+                  <option value="15">15 minutes</option>
+                  <option value="30">30 minutes</option>
+                  <option value="45">45 minutes</option>
+                  <option value="60">1 hour</option>
+                  <option value="90">1 hour 30 minutes</option>
+                </select>
+                <small class="field-error" id="durationError"></small>
+              </label>
+            </div>
+          </section>
+
+          <section class="form-section">
+            <div class="section-heading">
+              <span>03</span>
+              <div><h2>Candidate files</h2><p>Add one clear photo and the latest résumé.</p></div>
+            </div>
+            <div class="field-grid upload-grid">
+              <label class="upload-card" for="photoInput" id="photoDropzone">
+                <input id="photoInput" name="photo" type="file" accept="image/jpeg,image/png,image/webp" required />
+                <span class="upload-icon" aria-hidden="true">↥</span>
+                <strong>Upload photo</strong>
+                <span>JPG, PNG or WebP · Up to 10 MB</span>
+                <b>Choose photo</b>
+                <small class="file-name" id="photoName">No photo selected</small>
+              </label>
+              <label class="upload-card" for="resumeInput" id="resumeDropzone">
+                <input id="resumeInput" name="resume" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required />
+                <span class="upload-icon document" aria-hidden="true">▤</span>
+                <strong>Upload résumé</strong>
+                <span>PDF, DOC or DOCX · Up to 10 MB</span>
+                <b>Choose résumé</b>
+                <small class="file-name" id="resumeName">No résumé selected</small>
+              </label>
+            </div>
+            <p class="files-error" id="filesError" aria-live="polite"></p>
+          </section>
+
+          <label class="consent-row">
+            <input id="storageConsent" type="checkbox" required />
+            <span>I have permission to store this candidate’s details, photo and résumé in my private interview library.</span>
+          </label>
+
+          <div class="form-actions">
+            <button class="secondary" id="clearButton" type="button">Clear form</button>
+            <button class="primary" id="saveButton" type="submit">Save interview <span aria-hidden="true">→</span></button>
+          </div>
+          <p class="form-message" id="formMessage" aria-live="polite"></p>
+        </form>
+
+        <aside class="summary-card" aria-labelledby="summaryTitle">
+          <div class="summary-heading"><p class="eyebrow">LIVE SUMMARY</p><h2 id="summaryTitle">Interview overview</h2></div>
+          <div class="photo-preview" id="photoPreview">
+            <span aria-hidden="true">◎</span>
+            <p>Candidate photo preview</p>
+          </div>
+          <div class="candidate-summary">
+            <small>Candidate</small>
+            <strong id="summaryName">Name will appear here</strong>
+          </div>
+          <dl class="schedule-summary">
+            <div><dt>Date</dt><dd id="summaryDate">Not selected</dd></div>
+            <div><dt>Start time</dt><dd id="summaryTime">Not selected</dd></div>
+            <div><dt>Duration</dt><dd id="summaryDuration">Not selected</dd></div>
+          </dl>
+          <div class="resume-summary">
+            <span aria-hidden="true">▤</span>
+            <div><small>Résumé</small><strong id="summaryResume">Not uploaded</strong></div>
+          </div>
+          <p class="privacy-note">After you save, these details and files are stored in the private Railway library connected to your personal access key.</p>
+        </aside>
+      </div>
+
+      <section class="saved-section" id="savedSection" aria-labelledby="savedTitle">
+        <div class="saved-heading">
+          <div><p class="eyebrow">PRIVATE LIBRARY</p><h2 id="savedTitle">Saved interviews</h2><p>Up to 50 interviews for each personal access key.</p></div>
+          <button class="secondary" id="refreshInterviewsButton" type="button">Refresh list</button>
+        </div>
+        <p class="saved-message" id="savedMessage" aria-live="polite">Enter your personal access key and press Load saved.</p>
+        <div class="saved-grid" id="savedGrid"></div>
+      </section>
+
+      <footer>Interview Studio — A product by <strong>Bluqq</strong></footer>
+    </main>
+    <script type="module" src="/src/interview.ts"></script>
+  </body>
+</html>

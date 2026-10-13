@@ -30,12 +30,29 @@ const outputPlaceholder = el<HTMLElement>("outputPlaceholder");
 const cameraSelect = el<HTMLSelectElement>("cameraSelect");
 const referenceInput = el<HTMLInputElement>("referenceInput");
 const referencePreview = el<HTMLImageElement>("referencePreview");
+const originalReferencePreview = el<HTMLImageElement>("originalReferencePreview");
+const referenceComparison = el<HTMLElement>("referenceComparison");
+const editedReferenceFigure = el<HTMLElement>("editedReferenceFigure");
 const referenceDetails = el<HTMLElement>("referenceDetails");
 const referenceState = el<HTMLElement>("referenceState");
+const shirtColourPicker = el<HTMLInputElement>("shirtColourPicker");
+const shirtColour = el<HTMLInputElement>("shirtColour");
+const shirtEditMode = el<HTMLSelectElement>("shirtEditMode");
+const shirtWrinkles = el<HTMLSelectElement>("shirtWrinkles");
+const shirtFraming = el<HTMLSelectElement>("shirtFraming");
+const shirtAspectRatio = el<HTMLSelectElement>("shirtAspectRatio");
+const shirtRatioField = el<HTMLElement>("shirtRatioField");
+const generateShirtEditButton = el<HTMLButtonElement>("generateShirtEditButton");
+const useOriginalReferenceButton = el<HTMLButtonElement>("useOriginalReferenceButton");
+const shirtEditStatus = el<HTMLElement>("shirtEditStatus");
 const cameraDetails = el<HTMLElement>("cameraDetails");
 const outputDetails = el<HTMLElement>("outputDetails");
 const networkDetails = el<HTMLElement>("networkDetails");
 const accessKey = el<HTMLInputElement>("accessKey");
+const transformationPrompt = el<HTMLTextAreaElement>("transformationPrompt");
+const loadPromptButton = el<HTMLButtonElement>("loadPromptButton");
+const resetPromptButton = el<HTMLButtonElement>("resetPromptButton");
+const promptStatus = el<HTMLElement>("promptStatus");
 const consent = el<HTMLInputElement>("consent");
 const cameraButton = el<HTMLButtonElement>("cameraButton");
 const connectButton = el<HTMLButtonElement>("connectButton");
@@ -54,10 +71,14 @@ let checkingReference = false;
 let preparedReference: File | null = null;
 let appliedReference: File | null = null;
 let referenceUrl: string | null = null;
+let originalReferenceUrl: string | null = null;
+let originalReference: File | null = null;
+let editingReference = false;
 let usage: UsageReporter | null = null;
 // Memory-only, retained through stop() so a failed connection's token can be
 // redacted from its error. Replaced on the next token request; never logged.
 let diagnosticToken = "";
+let loadedDefaultPrompt = "";
 
 function model() {
   return models.realtime(EXTENSION_MODEL);
@@ -73,7 +94,246 @@ function releaseReferencePreview() {
   if (referenceUrl) URL.revokeObjectURL(referenceUrl);
   referenceUrl = null;
   referencePreview.removeAttribute("src");
-  referencePreview.hidden = true;
+  editedReferenceFigure.hidden = true;
+}
+function showOriginalReference(file: File | null) {
+  if (originalReferenceUrl) URL.revokeObjectURL(originalReferenceUrl);
+  originalReferenceUrl = null;
+  originalReferencePreview.removeAttribute("src");
+  referenceComparison.hidden = !file;
+  if (!file) return;
+  originalReferenceUrl = URL.createObjectURL(file);
+  originalReferencePreview.src = originalReferenceUrl;
+}
+function setShirtEditStatus(text: string, tone = "idle") {
+  shirtEditStatus.textContent = text;
+  shirtEditStatus.dataset.tone = tone;
+}
+function setPromptStatus(text: string, tone = "idle") {
+  promptStatus.textContent = text;
+  promptStatus.dataset.tone = tone;
+}
+function replaceReferenceFile(file: File) {
+  const transfer = new DataTransfer();
+  transfer.items.add(file);
+  referenceInput.files = transfer.files;
+}
+const frameRatios: Record<string, number> = { "4:5": 4 / 5, "3:4": 3 / 4, "1:1": 1 };
+type FaceDetectorResult = { boundingBox: { x: number; y: number; width: number; height: number } };
+type FaceDetectorInstance = { detect(source: ImageBitmap): Promise<FaceDetectorResult[]> };
+type FaceDetectorConstructor = new (options?: { fastMode?: boolean; maxDetectedFaces?: number }) => FaceDetectorInstance;
+let mediaPipeFaceDetector: Promise<import("@mediapipe/tasks-vision").FaceDetector> | null = null;
+
+async function detectLargestFace(bitmap: ImageBitmap): Promise<FaceDetectorResult | undefined> {
+  const NativeDetector = (window as unknown as { FaceDetector?: FaceDetectorConstructor }).FaceDetector;
+  if (NativeDetector) {
+    try {
+      const faces = await new NativeDetector({ fastMode: true, maxDetectedFaces: 1 }).detect(bitmap);
+      const face = faces.sort((left, right) =>
+        right.boundingBox.width * right.boundingBox.height - left.boundingBox.width * left.boundingBox.height,
+      )[0];
+      if (face) return face;
+    } catch { /* Use the bundled detector below. */ }
+  }
+
+  try {
+    mediaPipeFaceDetector ??= (async () => {
+      const { FaceDetector, FilesetResolver } = await import("@mediapipe/tasks-vision");
+      const vision = await FilesetResolver.forVisionTasks("/mediapipe/wasm");
+      return FaceDetector.createFromOptions(vision, {
+        baseOptions: { modelAssetPath: "/mediapipe/face_detector.tflite" },
+        runningMode: "IMAGE",
+        minDetectionConfidence: 0.45,
+      });
+    })();
+    const detector = await mediaPipeFaceDetector;
+    const detection = detector.detect(bitmap).detections.sort((left, right) => {
+      const leftBox = left.boundingBox;
+      const rightBox = right.boundingBox;
+      return (rightBox?.width || 0) * (rightBox?.height || 0) -
+        (leftBox?.width || 0) * (leftBox?.height || 0);
+    })[0];
+    const box = detection?.boundingBox;
+    if (box) {
+      return { boundingBox: { x: box.originX, y: box.originY, width: box.width, height: box.height } };
+    }
+  } catch {
+    mediaPipeFaceDetector = null;
+  }
+  return undefined;
+}
+
+async function cropPortraitFile(file: Blob, ratioName: string, outputName: string, fourButtonCrop = false): Promise<File> {
+  const bitmap = await createImageBitmap(file);
+  const ratio = frameRatios[ratioName] || frameRatios["4:5"];
+  let sourceX = 0, sourceY = 0, sourceWidth = bitmap.width, sourceHeight = bitmap.height;
+  const face = fourButtonCrop ? await detectLargestFace(bitmap) : undefined;
+  if (face) {
+    const box = face.boundingBox;
+    const desiredHeight = Math.min(
+      bitmap.height,
+      bitmap.width / ratio,
+      Math.max(box.height / 0.193, box.width / (0.24 * ratio)),
+    );
+    sourceHeight = desiredHeight;
+    sourceWidth = desiredHeight * ratio;
+    sourceX = Math.min(Math.max(0, box.x + box.width / 2 - sourceWidth / 2), bitmap.width - sourceWidth);
+    // Scale both headroom and the lower edge from the detected face, so close
+    // portraits and full-body photos produce the same four-button composition.
+    sourceY = Math.min(Math.max(0, box.y - box.height * 1.18), bitmap.height - sourceHeight);
+  } else if (fourButtonCrop) {
+    // Chromium does not expose FaceDetector on every Windows installation.
+    // Use a deterministic upper-torso crop instead of retaining the full
+    // portrait. Trim some empty space above the subject, then retain roughly
+    // 68% of the image height so the frame ends below the fourth shirt button.
+    sourceHeight = Math.min(bitmap.height * 0.68, bitmap.width / ratio);
+    sourceWidth = sourceHeight * ratio;
+    sourceX = Math.max(0, (bitmap.width - sourceWidth) / 2);
+    sourceY = 0;
+  } else if (sourceWidth / sourceHeight > ratio) {
+    const croppedWidth = sourceHeight * ratio;
+    sourceX = (sourceWidth - croppedWidth) / 2;
+    sourceWidth = croppedWidth;
+  } else {
+    const croppedHeight = sourceWidth / ratio;
+    sourceY = Math.max(0, (sourceHeight - croppedHeight) * 0.2);
+    sourceHeight = croppedHeight;
+  }
+  const scale = Math.min(1, 1600 / Math.max(sourceWidth, sourceHeight));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+  canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+  const context = canvas.getContext("2d");
+  if (!context) { bitmap.close(); throw new Error("This browser could not prepare the portrait frame."); }
+  context.drawImage(bitmap, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(
+    value => value ? resolve(value) : reject(new Error("This browser could not crop the portrait.")),
+    "image/jpeg", 0.95,
+  ));
+  return new File([blob], outputName, { type: "image/jpeg" });
+}
+async function restoreOriginalHead(edited: Blob, originalCrop: Blob, outputName: string): Promise<File> {
+  const [editedBitmap, originalBitmap] = await Promise.all([
+    createImageBitmap(edited),
+    createImageBitmap(originalCrop),
+  ]);
+  // The prepared original owns the final canvas. Gemini sometimes returns a
+  // zoomed portrait even when asked to preserve framing, so align its face to
+  // the original and composite only the garment area back into this canvas.
+  const width = originalBitmap.width;
+  const height = originalBitmap.height;
+  let centreX = width * 0.5;
+  let centreY = height * 0.3;
+  let radiusX = width * 0.2;
+  let radiusY = height * 0.235;
+  const [originalFace, editedFace] = await Promise.all([
+    detectLargestFace(originalBitmap),
+    detectLargestFace(editedBitmap),
+  ]);
+  const originalBox = originalFace?.boundingBox;
+  let editedScaleX = width / editedBitmap.width;
+  let editedScaleY = height / editedBitmap.height;
+  let editedX = 0;
+  let editedY = 0;
+  if (originalBox) {
+    centreX = originalBox.x + originalBox.width / 2;
+    centreY = originalBox.y + originalBox.height * 0.38;
+    radiusX = originalBox.width * 0.76;
+    radiusY = originalBox.height * 0.94;
+  }
+  if (originalBox && editedFace) {
+    const editedBox = editedFace.boundingBox;
+    const uniformScale = ((originalBox.width / editedBox.width) +
+      (originalBox.height / editedBox.height)) / 2;
+    editedScaleX = uniformScale;
+    editedScaleY = uniformScale;
+    editedX = (originalBox.x + originalBox.width / 2) -
+      (editedBox.x + editedBox.width / 2) * uniformScale;
+    editedY = (originalBox.y + originalBox.height / 2) -
+      (editedBox.y + editedBox.height / 2) * uniformScale;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    editedBitmap.close(); originalBitmap.close();
+    throw new Error("This browser could not preserve the original face.");
+  }
+  context.drawImage(originalBitmap, 0, 0, width, height);
+
+  const alignedEdit = document.createElement("canvas");
+  alignedEdit.width = width;
+  alignedEdit.height = height;
+  const alignedContext = alignedEdit.getContext("2d");
+  const garmentMask = document.createElement("canvas");
+  garmentMask.width = width;
+  garmentMask.height = height;
+  const garmentMaskContext = garmentMask.getContext("2d");
+  if (!alignedContext || !garmentMaskContext) {
+    editedBitmap.close(); originalBitmap.close();
+    throw new Error("This browser could not preserve the original framing.");
+  }
+  alignedContext.drawImage(
+    editedBitmap,
+    editedX,
+    editedY,
+    editedBitmap.width * editedScaleX,
+    editedBitmap.height * editedScaleY,
+  );
+  const faceWidth = originalBox?.width || width * 0.24;
+  const faceBottom = originalBox ? originalBox.y + originalBox.height : height * 0.42;
+  const garmentTop = Math.max(0, faceBottom - faceWidth * 0.08);
+  const topHalfWidth = faceWidth * 1.18;
+  const bottomHalfWidth = Math.max(faceWidth * 2.2, width * 0.44);
+  const maskFeather = Math.max(10, Math.round(Math.min(width, height) * 0.018));
+  garmentMaskContext.filter = `blur(${maskFeather}px)`;
+  garmentMaskContext.fillStyle = "white";
+  garmentMaskContext.beginPath();
+  garmentMaskContext.moveTo(centreX - topHalfWidth, garmentTop);
+  garmentMaskContext.lineTo(centreX + topHalfWidth, garmentTop);
+  garmentMaskContext.lineTo(Math.min(width, centreX + bottomHalfWidth), height + maskFeather);
+  garmentMaskContext.lineTo(Math.max(0, centreX - bottomHalfWidth), height + maskFeather);
+  garmentMaskContext.closePath();
+  garmentMaskContext.fill();
+  alignedContext.globalCompositeOperation = "destination-in";
+  alignedContext.drawImage(garmentMask, 0, 0);
+  alignedContext.globalCompositeOperation = "source-over";
+  context.drawImage(alignedEdit, 0, 0);
+
+  const overlay = document.createElement("canvas");
+  overlay.width = width;
+  overlay.height = height;
+  const overlayContext = overlay.getContext("2d");
+  const mask = document.createElement("canvas");
+  mask.width = width;
+  mask.height = height;
+  const maskContext = mask.getContext("2d");
+  if (!overlayContext || !maskContext) {
+    editedBitmap.close(); originalBitmap.close();
+    throw new Error("This browser could not preserve the original face.");
+  }
+  overlayContext.drawImage(originalBitmap, 0, 0, width, height);
+  const feather = Math.max(6, Math.round(Math.min(width, height) * 0.012));
+  maskContext.filter = `blur(${feather}px)`;
+  maskContext.fillStyle = "white";
+  maskContext.beginPath();
+  maskContext.ellipse(centreX, centreY, radiusX, radiusY, 0, 0, Math.PI * 2);
+  maskContext.fill();
+  overlayContext.globalCompositeOperation = "destination-in";
+  overlayContext.drawImage(mask, 0, 0);
+  overlayContext.globalCompositeOperation = "source-over";
+  context.drawImage(overlay, 0, 0);
+  editedBitmap.close();
+  originalBitmap.close();
+
+  const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(
+    value => value ? resolve(value) : reject(new Error("This browser could not preserve the original face.")),
+    "image/jpeg", 0.95,
+  ));
+  return new File([blob], outputName, { type: "image/jpeg" });
 }
 async function prepareReference() {
   const ownVersion = ++referenceVersion;
@@ -96,11 +356,18 @@ async function prepareReference() {
       throw new Error(`Reference is only ${bitmap.width} × ${bitmap.height}. Use an original image at least 512 × 512; upscaling does not restore face detail.`);
     }
     preparedReference = file;
-    referenceUrl = URL.createObjectURL(file);
-    referencePreview.src = referenceUrl;
-    referencePreview.hidden = false;
     const modestSize = Math.min(bitmap.width, bitmap.height) < 768;
-    referenceDetails.textContent = `${bitmap.width} × ${bitmap.height} · Original image used without cropping or recompression.${modestSize ? " A sharper, larger original can retain more beard and hair detail." : " Check that the face, full hair, beard, shoulders and clothing are visible."}`;
+    const isEdited = !!originalReference && file !== originalReference;
+    if (isEdited) {
+      referenceUrl = URL.createObjectURL(file);
+      referencePreview.src = referenceUrl;
+      editedReferenceFigure.hidden = false;
+    } else {
+      editedReferenceFigure.hidden = true;
+    }
+    referenceDetails.textContent = isEdited
+      ? `${bitmap.width} × ${bitmap.height} · AI shirt edit is now the active reference.${modestSize ? " A larger source can retain more facial detail." : " Check the face, framing, shirt and background before connecting."}`
+      : `${bitmap.width} × ${bitmap.height} · Original image used without cropping or recompression.${modestSize ? " A sharper, larger original can retain more beard and hair detail." : " Check that the face, full hair, beard, shoulders and clothing are visible."}`;
     referenceDetails.dataset.tone = modestSize ? "warning" : "idle";
   } catch (error) {
     if (ownVersion !== referenceVersion) return;
@@ -172,6 +439,9 @@ function errorText(error: unknown, fallback = "The operation failed without an e
   text = text.replace(/\b(?:https?|wss?):\/\/[^\s<>"']+/gi, "[URL redacted]")
     .replace(/\bBearer\s+[^\s,;"']+/gi, "Bearer [redacted]")
     .replace(/\b(api[_-]?key|access[_-]?key|token|authorization)\s*[=:]\s*[^\s,;]+/gi, "$1=[redacted]");
+  if (text.trim() === "[redacted]") {
+    return "A credential-related message was hidden for safety. Refresh the page and try the action again.";
+  }
   return text.length > 1200 ? text.slice(0, 1199) + "…" : text;
 }
 function showError(error: unknown) {
@@ -182,16 +452,126 @@ function showError(error: unknown) {
 function syncControls() {
   cameraButton.disabled = busy || !!connection;
   cameraSelect.disabled = busy || !!connection;
-  referenceInput.disabled = busy;
+  referenceInput.disabled = busy || editingReference;
   consent.disabled = busy || !!connection;
   accessKey.disabled = busy || !!connection;
+  transformationPrompt.disabled = busy || !!connection;
+  loadPromptButton.disabled = busy || !!connection;
+  resetPromptButton.disabled = busy || !!connection || !loadedDefaultPrompt;
   const validReference = !!preparedReference && preparedReference === referenceInput.files?.[0] && !checkingReference;
   connectButton.disabled = busy || !!connection || !camera || !validReference || !consent.checked;
   updateButton.disabled = busy || !connection || !validReference;
   fullscreenButton.disabled = !remote;
   stopButton.disabled = !camera && !remote && !busy;
+  generateShirtEditButton.disabled = busy || editingReference || !originalReference;
+  useOriginalReferenceButton.disabled = busy || editingReference || !originalReference || referenceInput.files?.[0] === originalReference;
+  for (const control of [shirtColourPicker, shirtColour, shirtEditMode, shirtWrinkles, shirtFraming, shirtAspectRatio]) {
+    control.disabled = busy || editingReference || (control === shirtAspectRatio && shirtFraming.value === "original");
+  }
+  shirtRatioField.classList.toggle("disabled", shirtFraming.value === "original");
   cameraButton.textContent = camera ? "Restart camera" : "Start camera";
   syncReferenceState();
+}
+
+async function loadDefaultPrompt() {
+  if (busy || connection) return;
+  if (accessKey.value.trim().length < 32) {
+    setPromptStatus("Enter your Bluqq personal access key first.", "error");
+    return;
+  }
+  loadPromptButton.disabled = true;
+  setPromptStatus("Loading the current Railway prompt…", "working");
+  try {
+    const response = await fetch("/api/processing-config", {
+      headers: { Authorization: "Bearer " + accessKey.value.trim() },
+      cache: "no-store", credentials: "omit", redirect: "error",
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(errorText(payload, "Could not load the default prompt."));
+    const config = processingConfig(payload);
+    loadedDefaultPrompt = config.prompt;
+    transformationPrompt.value = config.prompt;
+    resetPromptButton.disabled = false;
+    setPromptStatus("Default prompt loaded. Edit it before connecting, or leave it unchanged.", "success");
+  } catch (error) {
+    setPromptStatus(errorText(error, "Could not load the default prompt."), "error");
+  } finally {
+    syncControls();
+  }
+}
+
+function resetTransformationPrompt() {
+  if (!loadedDefaultPrompt || busy || connection) return;
+  transformationPrompt.value = loadedDefaultPrompt;
+  setPromptStatus("Prompt reset to the current Railway default.", "success");
+}
+
+async function generateShirtEdit() {
+  if (busy || editingReference || !originalReference) return;
+  if (accessKey.value.trim().length < 32) {
+    setShirtEditStatus("Enter your Bluqq personal access key before generating an edit.", "error");
+    return;
+  }
+  const source = originalReference;
+  const ownVersion = referenceVersion;
+  editingReference = true;
+  syncControls();
+  const started = Date.now();
+  setShirtEditStatus("Preparing portrait frame…", "working");
+  let timer = 0;
+  try {
+    const upload = shirtFraming.value === "auto"
+      ? await cropPortraitFile(source, shirtAspectRatio.value, "prepared-reference.jpg", true)
+      : source;
+    setShirtEditStatus("Editing clothing… 0s", "working");
+    timer = window.setInterval(() => {
+      setShirtEditStatus(`Editing clothing… ${Math.floor((Date.now() - started) / 1000)}s`, "working");
+    }, 1000);
+    const query = new URLSearchParams({
+      color: shirtColour.value.trim() || "soft blush pink",
+      mode: shirtEditMode.value,
+      wrinkles: shirtWrinkles.value,
+      framing: shirtFraming.value,
+      aspect_ratio: shirtAspectRatio.value,
+    });
+    const response = await fetch(`/api/edit-reference?${query}`, {
+      method: "POST",
+      headers: { Authorization: "Bearer " + accessKey.value.trim(), "Content-Type": upload.type },
+      body: upload,
+      cache: "no-store",
+      credentials: "omit",
+      redirect: "error",
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(errorText(payload, "Could not edit this reference image."));
+    }
+    // The original was cropped deterministically before upload. Do not crop
+    // the generated result a second time: another face-aware crop can shift
+    // the head/body and make a garment edit look like an identity change.
+    const edited = await restoreOriginalHead(
+      await response.blob(),
+      upload,
+      "shirt-edited-reference.jpg",
+    );
+    if (ownVersion !== referenceVersion || source !== originalReference) return;
+    replaceReferenceFile(edited);
+    await prepareReference();
+    setShirtEditStatus(`Shirt edit ready in exact ${shirtAspectRatio.value} four-button framing. It is now used by Connect, Apply reference and Save to extension.`, "success");
+  } catch (error) {
+    if (ownVersion === referenceVersion) setShirtEditStatus(errorText(error, "Could not edit this reference image."), "error");
+  } finally {
+    window.clearInterval(timer);
+    editingReference = false;
+    syncControls();
+  }
+}
+
+async function useOriginalReference() {
+  if (!originalReference || busy || editingReference) return;
+  replaceReferenceFile(originalReference);
+  await prepareReference();
+  setShirtEditStatus("Original reference restored. Existing Virtual CAM behaviour is active.", "success");
 }
 function clearRemote() {
   const previous = connection;
@@ -326,6 +706,7 @@ async function connect() {
   try {
     const token = await fetchToken(abort.signal, reporter, reference);
     if (ownVersion !== version) return;
+    const effectivePrompt = transformationPrompt.value.trim() || token.config.prompt;
     const client = createDecartClient({
       apiKey: token.apiKey,
       telemetry: false,
@@ -336,7 +717,7 @@ async function connect() {
       model: model(),
       mirror: false,
       // No resolution override: use the same provider default as the ZIP.
-      initialState: { prompt: { text: token.config.prompt, enhance: ENHANCE_PROMPT }, image: reference },
+      initialState: { prompt: { text: effectivePrompt, enhance: ENHANCE_PROMPT }, image: reference },
       onRemoteStream: (stream: MediaStream) => {
         if (ownVersion !== version) { stream.getTracks().forEach(track => track.stop()); return; }
         if (remote && remote !== stream) remote.getTracks().forEach(track => track.stop());
@@ -373,7 +754,7 @@ async function connect() {
     });
     if (ownVersion !== version) { connected.disconnect(); return; }
     connection = connected;
-    sessionPrompt = token.config.prompt;
+    sessionPrompt = effectivePrompt;
     appliedReference = reference;
     connected.on("error", (error) => {
       if (ownVersion !== version) return;
@@ -415,7 +796,25 @@ cameraButton.addEventListener("click", () => void startCamera());
 connectButton.addEventListener("click", () => void connect());
 updateButton.addEventListener("click", () => void update());
 stopButton.addEventListener("click", () => stop());
-referenceInput.addEventListener("change", () => void prepareReference());
+referenceInput.addEventListener("change", () => {
+  originalReference = referenceInput.files?.[0] || null;
+  showOriginalReference(originalReference);
+  setShirtEditStatus(originalReference
+    ? "Original photo ready. Editing is optional."
+    : "Choose a reference photo to enable editing.");
+  void prepareReference();
+});
+shirtColourPicker.addEventListener("input", () => { shirtColour.value = `${shirtColourPicker.value} solid colour`; });
+shirtFraming.addEventListener("change", syncControls);
+loadPromptButton.addEventListener("click", () => void loadDefaultPrompt());
+resetPromptButton.addEventListener("click", resetTransformationPrompt);
+accessKey.addEventListener("input", () => {
+  if (shirtEditStatus.textContent?.trim() === "[redacted]") {
+    setShirtEditStatus("Personal key updated. Press Generate shirt edit again.");
+  }
+});
+generateShirtEditButton.addEventListener("click", () => void generateShirtEdit());
+useOriginalReferenceButton.addEventListener("click", () => void useOriginalReference());
 // A new device needs fresh camera constraints.
 cameraSelect.addEventListener("change", () => {
   if (camera) { stop(); status("Settings changed — start camera again"); }
@@ -427,7 +826,7 @@ outputVideo.addEventListener("resize", updateOutputDetails);
 consent.addEventListener("change", syncControls);
 el<HTMLButtonElement>("refreshCamerasButton").addEventListener("click", () => void loadCameras().catch(showError));
 fullscreenButton.addEventListener("click", () => void el<HTMLElement>("outputCard").requestFullscreen().catch(showError));
-window.addEventListener("pagehide", () => { stop("closed"); ++referenceVersion; checkingReference = false; preparedReference = null; releaseReferencePreview(); });
+window.addEventListener("pagehide", () => { stop("closed"); ++referenceVersion; checkingReference = false; preparedReference = null; releaseReferencePreview(); showOriginalReference(null); });
 window.addEventListener("pageshow", () => { if (referenceInput.files?.[0] && !preparedReference) void prepareReference(); });
 window.addEventListener("beforeunload", () => stop("closed"));
 syncControls();
