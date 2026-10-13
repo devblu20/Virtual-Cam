@@ -25,6 +25,18 @@ button { cursor: pointer; }
 .preview-head b { font-size: 13px; }
 .preview-head small { color: #8290a5; font-size: 8px; font-weight: 800; letter-spacing: .16em; }
 .preview-dot { width: 8px; height: 8px; border-radius: 50%; background: #25b86a; box-shadow: 0 0 0 4px #e1f8eb; }
+.workflow-grid { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; align-items: center; gap: 10px; padding: 17px 0 15px; }
+.workflow-grid article { display: grid; min-height: 145px; align-content: start; padding: 15px; border: 1px solid #e5eaf2; border-radius: 14px; background: #fbfcfe; }
+.workflow-grid article > small { margin: 13px 0 5px; color: #8b97a8; font-size: 7px; font-weight: 850; letter-spacing: .15em; }
+.workflow-grid article > b { color: #1e2b41; font-size: 11px; }
+.workflow-grid article > p { margin: 7px 0 0; color: #7a879a; font-size: 8px; line-height: 1.55; }
+.workflow-icon { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 10px; font-size: 17px; font-weight: 800; }
+.workflow-icon.blue { background: #eaf1ff; color: #2461ea; }
+.workflow-icon.purple { background: #f0eaff; color: #8253df; }
+.workflow-icon.green { background: #e7f7ed; color: #16804a; }
+.workflow-arrow { color: #aab5c5; font-size: 16px; }
+.workflow-footer { display: flex; justify-content: space-between; gap: 12px; padding: 11px 13px; border-radius: 10px; background: #f5f8fc; color: #68768c; font-size: 8px; font-weight: 750; }
+.workflow-footer span::first-letter { color: #2a66ed; }
 .preview-row { gap: 12px; padding: 9px 2px; border-bottom: 1px solid #f0f2f6; }
 .preview-row > div { display: grid; min-width: 0; flex: 1; gap: 2px; }
 .preview-row b { color: #223047; font-size: 12px; }
