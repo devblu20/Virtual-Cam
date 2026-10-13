@@ -2,28 +2,27 @@ import { createDecartClient, models, type RealTimeClient } from "@decartai/sdk";
 import "./style.css";
 import { UsageReporter, referenceMetadata } from "./usage";
 
-// Website Lucy 2.5 trial; extension configuration remains on Lucy 2.1.
-// The v2 contract supplies the assigned prompt; website model options are separate.
+// Version 3 assigns model, enhancement, self-anchoring and prompt from Railway.
 // Personal prompts are assigned by access-key user ID on Railway.
 // Every new connection receives a validated, session-pinned text configuration.
-type ProcessingConfig = { schemaVersion: 2; prompt: string; revision: string; userId: string; displayName: string; model: string; enhance: false };
+type ProcessingConfig = { schemaVersion: 3; prompt: string; revision: string; userId: string; displayName: string; model: string; enhance: boolean; selfAnchor: boolean };
 let sessionPrompt: string | null = null;
 function processingConfig(value: unknown): ProcessingConfig {
   const config = value as Partial<ProcessingConfig> | null;
-  if (!config || config.schemaVersion !== 2 || typeof config.prompt !== "string" ||
+  if (!config || config.schemaVersion !== 3 || typeof config.prompt !== "string" ||
       !config.prompt.trim() || config.prompt.length > 1024 ||
       typeof config.userId !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(config.userId) ||
       typeof config.displayName !== "string" || config.displayName.length > 80 ||
-      config.model !== "lucy-2.1" || config.enhance !== false ||
+      !["lucy-2.1", "lucy-2.5"].includes(config.model || "") || typeof config.enhance !== "boolean" || typeof config.selfAnchor !== "boolean" ||
       typeof config.revision !== "string" || !/^[a-f0-9]{64}$/.test(config.revision)) {
     throw new Error("Railway did not provide a valid processing prompt. Deploy the updated backend, then reconnect.");
   }
-  return { schemaVersion: 2, prompt: config.prompt, revision: config.revision, userId: config.userId, displayName: config.displayName, model: config.model, enhance: false };
+  return { schemaVersion: 3, prompt: config.prompt, revision: config.revision, userId: config.userId, displayName: config.displayName, model: config.model!, enhance: config.enhance, selfAnchor: config.selfAnchor };
 }
-const WEBSITE_MODEL = "lucy-2.5";
+let sessionConfig: ProcessingConfig | null = null;
 const CAMERA_FPS = 25;
 // Decart recommends enhancement for Lucy 2.5 structured prompts.
-const ENHANCE_PROMPT = true;
+
 
 const el = <T extends HTMLElement>(id: string) => document.querySelector<T>("#" + id)!;
 const inputVideo = el<HTMLVideoElement>("inputVideo");
@@ -84,7 +83,7 @@ let diagnosticToken = "";
 let loadedDefaultPrompt = "";
 
 function model() {
-  return models.realtime(WEBSITE_MODEL);
+  return models.realtime(sessionConfig?.model === "lucy-2.1" ? "lucy-2.1" : "lucy-2.5");
 }
 function syncReferenceState() {
   referenceState.textContent = checkingReference ? "Checking image locally…"
@@ -401,7 +400,7 @@ function updateOutputDetails() {
   const target = model();
   const belowTarget = !!(width && height && width * height < target.width * target.height);
   outputDetails.textContent = width && height
-    ? `Received: ${width} × ${height} · Lucy 2.5${belowTarget ? " — lower pixel count than the model input; inspect output detail." : ""}`
+    ? `Received: ${width} × ${height} · ${sessionConfig?.model === "lucy-2.1" ? "Lucy 2.1" : "Lucy 2.5"}${belowTarget ? " — lower pixel count than the model input; inspect output detail." : ""}`
     : "Output: provider default, matching the extension · Waiting for decoded video dimensions…";
   outputDetails.dataset.tone = belowTarget ? "warning" : "idle";
 }
@@ -487,7 +486,7 @@ async function loadDefaultPrompt() {
   loadPromptButton.disabled = true;
   setPromptStatus("Loading the current Railway prompt…", "working");
   try {
-    const response = await fetch("/api/client-config", {
+    const response = await fetch("/api/client-config?version=3", {
       headers: { Authorization: "Bearer " + requestedKey },
       cache: "no-store", credentials: "omit", redirect: "error",
       signal: AbortSignal.timeout(15000),
@@ -668,7 +667,7 @@ async function fetchToken(signal: AbortSignal, reporter: UsageReporter, referenc
   const response = await fetch("/api/realtime-token", {
     method: "POST",
     headers: { Authorization: "Bearer " + accessKey.value.trim(), "Content-Type": "application/json" },
-    body: JSON.stringify({ processingConfigVersion: 2, usage: { source: "website", platform: "website", version: "website-lucy-2.5-enhanced", avatar } }),
+    body: JSON.stringify({ processingConfigVersion: 3, usage: { source: "website", platform: "website", version: "website-server-settings-v3", avatar } }),
     cache: "no-store", credentials: "omit", redirect: "error",
     signal,
   });
@@ -714,6 +713,8 @@ async function connect() {
   try {
     const token = await fetchToken(abort.signal, reporter, reference);
     if (ownVersion !== version) return;
+    sessionConfig = token.config;
+    el<HTMLElement>("processingProfile").textContent = `${token.config.model} · enhancement ${token.config.enhance ? "on" : "off"} · Railway managed`;
     const effectivePrompt = token.config.prompt;
     transformationPrompt.value = effectivePrompt;
     loadedDefaultPrompt = effectivePrompt;
@@ -726,9 +727,10 @@ async function connect() {
     });
     const connected = await client.realtime.connect(camera, {
       model: model(),
+      queryParams: token.config.model === "lucy-2.5" ? { self_anchor: String(token.config.selfAnchor) } : {},
       mirror: false,
       // No resolution override: use the same provider default as the ZIP.
-      initialState: { prompt: { text: effectivePrompt, enhance: ENHANCE_PROMPT }, image: reference },
+      initialState: { prompt: { text: effectivePrompt, enhance: token.config.enhance }, image: reference },
       onRemoteStream: (stream: MediaStream) => {
         if (ownVersion !== version) { stream.getTracks().forEach(track => track.stop()); return; }
         if (remote && remote !== stream) remote.getTracks().forEach(track => track.stop());
@@ -795,7 +797,7 @@ async function update() {
     const avatar = await referenceMetadata(reference);
     if (ownVersion !== version || !connection) return;
     if (sessionPrompt === null) throw new Error("Reconnect to load the Railway processing prompt.");
-    await connection.set({ image: reference, prompt: sessionPrompt, enhance: ENHANCE_PROMPT });
+    await connection.set({ image: reference, prompt: sessionPrompt, enhance: sessionConfig!.enhance });
     if (ownVersion === version) { usage?.avatar(avatar); appliedReference = reference; notice.hidden = true; status("AI transformation live", "live"); }
   } catch (error) {
     if (ownVersion === version) showError(error);

@@ -14,7 +14,7 @@ const source = usageSource + "\n" + readFileSync(new URL("../src/main.ts", impor
   .replace('import { UsageReporter, referenceMetadata } from "./usage";', "");
 const compiled = (await transformWithOxc(source, "main.ts")).code.replace(/export\s*\{\s*\};?/g, "");
 const extensionProfile = JSON.parse(readFileSync(new URL("./fixtures/bluqq-0.3.8-video-profile.json", import.meta.url), "utf8"));
-const processingConfig = { schemaVersion: 2, prompt: 'Test prompt supplied only by Railway', revision: 'a'.repeat(64), userId: 'krishna', displayName: 'Krishna', model:'lucy-2.1', enhance:false };
+const processingConfig = { schemaVersion: 3, prompt: 'Test prompt supplied only by Railway', revision: 'a'.repeat(64), userId: 'krishna', displayName: 'Krishna', model:'lucy-2.5', enhance:true, selfAnchor:true };
 
 function media() {
   const track = { stopped: false, settings: { width: 1280, height: 720, frameRate: 30 }, listeners: {}, stop() { this.stopped = true; },
@@ -278,7 +278,7 @@ test("website uses Bluqq branding without editable prompt controls", () => {
   assert.doesNotMatch(html, /id="(?:promptInput|enhanceInput)"/);
   assert.match(html, /agree to send my camera video, reference image, and Bluqq's server-provided prompt/);
   assert.match(html, /AI-generated video/);
-  assert.match(html, /Lucy 2\.5 test · prompt enhancement on/);
+  assert.match(html, /Railway-managed model, enhancement and per-user prompts/);
   assert.doesNotMatch(html, /id="(?:modelSelect|resolutionSelect)"/);
   assert.match(html, /upload the same portrait/);
 });
@@ -292,7 +292,7 @@ test("server prompt is pinned for Lucy 2.5 connection and reference updates with
     const initial = h.calls.decart[0][1].initialState.prompt;
     assert.equal(initial.text, processingConfig.prompt);
     assert.match(h.el("promptStatus").textContent, /Krishna/);
-    assert.equal(JSON.parse(h.calls.fetch[0][1].body).processingConfigVersion, 2);
+    assert.equal(JSON.parse(h.calls.fetch[0][1].body).processingConfigVersion, 3);
     assert.equal(initial.enhance, true);
     assert.equal(h.calls.decart[0][1].initialState.image, h.el("referenceInput").files[0]);
     assert.match(h.el("referenceState").textContent, /Reference applied/);
@@ -595,4 +595,18 @@ test("video and reference previews keep the full frame rather than cropping hair
   const css = readFileSync(new URL("../src/style.css", import.meta.url), "utf8");
   assert.match(css, /\.video-card video\s*\{[^}]*object-fit: contain/);
   assert.match(css, /\.reference-figure img\s*\{[^}]*object-fit: contain/);
+});
+
+test("Railway controls website model, enhancement and self anchoring", async () => {
+ for (const model of ['lucy-2.1','lucy-2.5']) {
+  const h=harness();
+  try {
+   h.hooks.fetch=async()=>({ok:true,json:async()=>({apiKey:'test',processingConfig:{...processingConfig,model,enhance:false,selfAnchor:false}})});
+   await h.click('cameraButton');await h.click('connectButton');
+   const options=h.calls.decart[0][1];
+   assert.equal(options.model.name,model);assert.equal(options.initialState.prompt.enhance,false);
+   assert.equal(options.queryParams.self_anchor,model==='lucy-2.5'?'false':undefined);
+   await h.click('updateButton');assert.equal(h.calls.updates[0].enhance,false);
+  } finally {h.cleanup();}
+ }
 });

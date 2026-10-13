@@ -1,4 +1,5 @@
 """Persistent user credentials and plain-text prompt assignments (no remote code)."""
+import json
 import hashlib
 import hmac
 import os
@@ -42,6 +43,26 @@ class ManagedUsers(ReferenceStore):
           revision INTEGER NOT NULL DEFAULT 1, created REAL NOT NULL, updated REAL NOT NULL)''')
         db.execute('''CREATE TABLE IF NOT EXISTS managed_defaults (
           id INTEGER PRIMARY KEY CHECK(id=1), prompt TEXT NOT NULL, revision INTEGER NOT NULL)''')
+
+    def runtime(self):
+        with self.connection() as db:
+            db.execute("CREATE TABLE IF NOT EXISTS managed_runtime (id INTEGER PRIMARY KEY, settings TEXT NOT NULL, revision INTEGER NOT NULL)")
+            row = db.execute("SELECT settings,revision FROM managed_runtime WHERE id=1").fetchone()
+        return dict(json.loads(row['settings']), revision=row['revision']) if row else dict(model='lucy-2.5', enhance=True, selfAnchor=True, revision=0)
+
+    def save_runtime(self, body):
+        if body.get('model') not in ('lucy-2.1', 'lucy-2.5') or type(body.get('enhance')) is not bool or type(body.get('selfAnchor')) is not bool or type(body.get('revision')) is not int:
+            raise HTTPException(400, 'Choose a supported model and valid settings.')
+        self.runtime()
+        with self.connection() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row = db.execute('SELECT revision FROM managed_runtime WHERE id=1').fetchone()
+            revision = row['revision'] if row else 0
+            if revision != body['revision']:
+                raise HTTPException(409, 'Settings changed. Refresh before saving.')
+            settings = {k: body[k] for k in ('model', 'enhance', 'selfAnchor')}
+            db.execute('INSERT INTO managed_runtime VALUES(1,?,?) ON CONFLICT(id) DO UPDATE SET settings=excluded.settings,revision=excluded.revision', (json.dumps(settings), revision+1))
+        return dict(settings, revision=revision+1)
 
     def rows(self):
         if self.directory is None or not (self.directory / 'references.sqlite3').exists():
@@ -99,20 +120,25 @@ class ManagedUsers(ReferenceStore):
                     return dict(row)
         return dict(prompt=prompt_text(load_processing_config()['prompt']), revision=0)
 
-    def config(self, owner):
+    def config(self, owner, version=2):
         row = self.user(owner)
         if not row['active']:
             raise HTTPException(401, 'Access key is revoked.')
         prompt = row['prompt'] or self.default()['prompt']
-        return dict(schemaVersion=2, prompt=prompt_text(prompt),
+        result = dict(schemaVersion=2, prompt=prompt_text(prompt),
                     revision=hashlib.sha256(prompt.encode()).hexdigest(),
                     userId=owner, displayName=row['name'], room=row['room'],
                     model='lucy-2.1', enhance=False)
+        if version == 3:
+            runtime = self.runtime()
+            result.update(schemaVersion=3, **{k: runtime[k] for k in ('model', 'enhance', 'selfAnchor')})
+            result['revision'] = hashlib.sha256(json.dumps([prompt, runtime], sort_keys=True).encode()).hexdigest()
+        return result
 
     def listing(self):
         rows = {k: self.public(dict(id=k, name=k, active=1, prompt=None, room='', revision=0, created=0, updated=0)) for k in self.legacy}
         rows.update({r['id']: self.public(r) for r in self.rows()})
-        return dict(users=list(rows.values()), default=self.default())
+        return dict(users=list(rows.values()), default=self.default(), runtime=self.runtime())
 
     def create(self, name):
         name = label(name)
@@ -185,7 +211,9 @@ def register_managed_routes(app, store):
             raise HTTPException(403, 'Administrator access required.')
 
     @app.get('/api/client-config')
-    async def configuration(request: Request):
+    async def configuration(request: Request, version: int = 2):
+        if version not in (2, 3):
+            raise HTTPException(400, "Unsupported configuration version.")
         owner = await run_in_threadpool(store.authenticate, request)
         now, bucket = time.monotonic(), requests[owner]
         while bucket and now-bucket[0] >= 60:
@@ -193,7 +221,15 @@ def register_managed_routes(app, store):
         if len(bucket) >= 30:
             raise HTTPException(429, 'Too many configuration checks.')
         bucket.append(now)
-        return await run_in_threadpool(store.config, owner)
+        return await run_in_threadpool(store.config, owner, version)
+
+    @app.put('/api/admin/runtime')
+    async def runtime(request: Request):
+        await run_in_threadpool(admin, request)
+        body = await small_json(request)
+        if not isinstance(body, dict):
+            raise HTTPException(400, 'Settings required.')
+        return await run_in_threadpool(store.save_runtime, body)
 
     @app.get('/api/admin/users')
     async def listing(request: Request):

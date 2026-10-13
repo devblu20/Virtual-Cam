@@ -42,6 +42,27 @@ class ManagedTests(unittest.TestCase):
     def save(self, user, **updates):
         return self.client.put('/api/admin/users/' + user['id'], headers={**auth(ADMIN), 'Content-Type':'application/json'}, content=json.dumps({'revision': user['revision'], **updates}))
 
+    def test_runtime_settings_v3_and_legacy_isolation(self):
+        a = self.create()
+        endpoint = '/api/client-config?version=3'
+        old = self.config(a['accessKey']).json()
+        first = self.client.get(endpoint, headers=auth(a['accessKey'])).json()
+        self.assertEqual((first['model'], first['enhance'], first['selfAnchor']), ('lucy-2.5', True, True))
+        self.assertEqual(old['model'], 'lucy-2.1')
+        self.assertFalse(old['enhance'])
+        settings = dict(model='lucy-2.1', enhance=False, selfAnchor=False, revision=0)
+        self.assertEqual(self.client.put('/api/admin/runtime', headers=auth(a['accessKey']), json=settings).status_code, 403)
+        self.assertEqual(self.client.put('/api/admin/runtime', headers=auth(ADMIN), json={**settings, 'model':'bad'}).status_code, 400)
+        self.assertEqual(self.client.put('/api/admin/runtime', headers=auth(ADMIN), json=settings).status_code, 200)
+        self.assertEqual(self.client.put('/api/admin/runtime', headers=auth(ADMIN), json=settings).status_code, 409)
+        current = self.client.get(endpoint, headers=auth(a['accessKey'])).json()
+        self.assertEqual(current['model'], 'lucy-2.1')
+        self.assertNotEqual(first['revision'], current['revision'])
+        self.assertEqual(old, self.config(a['accessKey']).json())
+        token = self.client.post('/api/realtime-token', headers=auth(a['accessKey']), json={'processingConfigVersion':3})
+        self.assertEqual(token.status_code, 200, token.text)
+        self.assertEqual(token.json()['processingConfig'], current)
+
     def test_key_ownership_overrides_typed_name_and_client_prompt(self):
         a, b = self.create(), self.create('Same name')
         self.assertEqual(self.save(a['user'], prompt='Soft neutral light.').status_code, 200)

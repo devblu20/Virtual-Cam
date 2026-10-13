@@ -210,9 +210,9 @@ def create_app() -> FastAPI:
         usage = usage_metadata(body)
         configuration = None
         if isinstance(body, dict) and "processingConfigVersion" in body:
-            if type(body["processingConfigVersion"]) is not int or body["processingConfigVersion"] not in (1, 2):
+            if type(body["processingConfigVersion"]) is not int or body["processingConfigVersion"] not in (1, 2, 3):
                 raise HTTPException(400, "Unsupported processing configuration version.")
-            configuration = await run_in_threadpool(access_keys.config, user) if body["processingConfigVersion"] == 2 else await run_in_threadpool(load_processing_config)
+            configuration = await run_in_threadpool(access_keys.config, user, body["processingConfigVersion"]) if body["processingConfigVersion"] in (2, 3) else await run_in_threadpool(load_processing_config)
 
         async with quota_lock:
             now = time.monotonic()
