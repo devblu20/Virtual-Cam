@@ -51,6 +51,12 @@ function timeLabel(value: string) {
   return new Intl.DateTimeFormat("en-IN", { hour: "numeric", minute: "2-digit" }).format(new Date(2000, 0, 1, hours, minutes));
 }
 
+function durationLabel(minutes: number) {
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours} hr${hours > 1 ? "s" : ""}${minutes % 60 ? ` ${minutes % 60} min` : ""}`;
+}
+
 function safe(value: string) {
   const span = document.createElement("span"); span.textContent = value; return span.innerHTML;
 }
@@ -61,7 +67,7 @@ function render() {
   rows.replaceChildren();
   shown.forEach((item, index) => {
     const row = document.createElement("tr");
-    row.innerHTML = `<td class="row-number">${index + 1}</td><td><div class="candidate-cell"><span class="face-photo" title="${safe(item.photoName)}"><img src="${item.thumbnail}" alt="${safe(item.candidateName)} candidate photo" /></span><strong class="candidate-name">${safe(item.candidateName)}</strong></div></td><td>${dateLabel(item.interviewDate)}</td><td>${timeLabel(item.startTime)}</td><td>${item.duration} min</td><td><div class="resume-cell"><span title="${safe(item.resumeName)}">${safe(item.resumeName)}</span><button class="download" type="button">↓ Download résumé</button></div></td><td><div class="row-actions"><button class="edit" type="button">Edit details</button><button class="delete" type="button">Delete</button></div></td>`;
+    row.innerHTML = `<td class="row-number">${index + 1}</td><td><div class="candidate-cell"><span class="face-photo" title="${safe(item.photoName)}"><img src="${item.thumbnail}" alt="${safe(item.candidateName)} candidate photo" /></span><strong class="candidate-name">${safe(item.candidateName)}</strong></div></td><td>${dateLabel(item.interviewDate)}</td><td>${timeLabel(item.startTime)}</td><td>${durationLabel(item.duration)}</td><td><div class="resume-cell"><span title="${safe(item.resumeName)}">${safe(item.resumeName)}</span><button class="download" type="button">↓ Download résumé</button></div></td><td><div class="row-actions"><button class="edit" type="button">Edit details</button><button class="delete" type="button">Delete</button></div></td>`;
     row.querySelector<HTMLButtonElement>(".download")!.onclick = () => downloadResume(item);
     row.querySelector<HTMLButtonElement>(".edit")!.onclick = () => openDialog(item);
     row.querySelector<HTMLButtonElement>(".delete")!.onclick = () => removeInterview(item);
