@@ -56,7 +56,8 @@ def shirt_edit_prompt(color: str, mode: str, wrinkles: str, framing: str, aspect
     )
     frame = (
         f"The browser has already cropped the input to the required upper-torso {aspect_ratio} frame with a "
-        "a balanced small margin of clear space above the hair and only the upper four shirt buttons visible. Preserve this "
+        "a balanced margin above the hair, both outer shirt and sleeve edges fully visible, clear background margin on both sides, "
+        "and only the upper four shirt buttons visible. Preserve this "
         "exact canvas, crop, scale, composition and aspect ratio. Do not zoom, crop, extend, rotate, reframe, "
         "reposition or resize the person or background. Return an image with the same width and height as the input."
         if framing == "auto" else
