@@ -59,12 +59,11 @@ th { background: #f5f7fa; color: #657287; font-size: 10px; font-weight: 800; let
 th:last-child, td:last-child { border-right: 0; }
 .row-number { width: 46px; color: #8792a3; text-align: center; }
 .candidate-name { color: #1c283b; }
-.photo-column { width: 150px; }
+.photo-column { width: 96px; text-align: center; }
 .actions-column { width: 150px; }
-.photo-preview { display: flex; align-items: center; gap: 9px; }
-.face-photo { position: relative; width: 62px; height: 72px; flex: 0 0 auto; overflow: hidden; border: 1px solid #dce4ef; border-radius: 10px; background: #eef2f7; }
-.face-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; transform: scale(1.7); transform-origin: 50% 21%; }
-.photo-preview small { max-width: 66px; overflow: hidden; color: #7a8799; font-size: 9px; font-weight: 600; text-overflow: ellipsis; }
+.photo-cell { text-align: center; }
+.face-photo { display: inline-grid; width: 58px; height: 58px; place-items: center; overflow: hidden; border: 3px solid #fff; border-radius: 16px; background: #eef2f7; box-shadow: 0 0 0 1px #d7e0ec, 0 5px 14px rgba(29, 53, 87, .13); }
+.face-photo img { width: 100%; height: 100%; object-fit: cover; }
 .resume-cell { display: grid; gap: 7px; }
 .resume-cell span { overflow: hidden; color: #667489; font-size: 9px; text-overflow: ellipsis; }
 .resume-cell button { justify-self: start; padding: 7px 9px; border: 1px solid #bad0ff; border-radius: 7px; background: #eff5ff; color: #1e5eff; font-size: 9px; font-weight: 750; }

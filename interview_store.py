@@ -19,6 +19,7 @@ from xml.sax.saxutils import escape
 
 from fastapi import HTTPException, Request
 from fastapi.responses import Response
+from PIL import Image
 from starlette.concurrency import run_in_threadpool
 
 from reference_library import validate_image
@@ -33,6 +34,25 @@ RESUME_MIMES = {
     "application/msword": "doc",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
 }
+
+
+def face_thumbnail(thumbnail):
+    """Turn the stored full portrait thumbnail into a compact upper-face preview."""
+    try:
+        with Image.open(io.BytesIO(thumbnail)) as image:
+            image = image.convert("RGB")
+            width, height = image.size
+            side = min(width, max(1, round(height * 0.56)))
+            left = max(0, (width - side) // 2)
+            top = max(0, min(height - side, round(height * 0.035)))
+            image = image.crop((left, top, left + side, top + side)).resize((160, 160), Image.Resampling.LANCZOS)
+            output = io.BytesIO()
+            image.save(output, format="JPEG", quality=82, optimize=True)
+            return output.getvalue()
+    except (OSError, ValueError):
+        return thumbnail
+
+
 def excel_column(number):
     result = ""
     while number:
@@ -151,7 +171,7 @@ class InterviewStore:
             "interviewDate": row["interview_date"], "startTime": row["start_time"],
             "duration": row["duration"], "photoName": row["photo_name"],
             "resumeName": row["resume_name"], "createdAt": row["created"],
-            "thumbnail": "data:image/jpeg;base64," + base64.b64encode(row["thumbnail"]).decode("ascii"),
+            "thumbnail": "data:image/jpeg;base64," + base64.b64encode(face_thumbnail(row["thumbnail"])).decode("ascii"),
         }
 
     def list(self, owner):
