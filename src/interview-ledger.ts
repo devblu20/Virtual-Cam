@@ -19,6 +19,7 @@ const consentInput = get<HTMLInputElement>("ledgerConsent");
 const submitButton = get<HTMLButtonElement>("submitInterviewButton");
 let credentials = "";
 let interviews: Interview[] = [];
+let editing: Interview | null = null;
 
 const current = new Date();
 const today = new Date(current.getTime() - current.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -60,8 +61,9 @@ function render() {
   rows.replaceChildren();
   shown.forEach((item, index) => {
     const row = document.createElement("tr");
-    row.innerHTML = `<td class="row-number">${index + 1}</td><td><div class="candidate-cell"><img src="${item.thumbnail}" alt="" /><strong>${safe(item.candidateName)}</strong></div></td><td>${dateLabel(item.interviewDate)}</td><td>${timeLabel(item.startTime)}</td><td>${item.duration} min</td><td title="${safe(item.photoName)}">${safe(item.photoName)}</td><td title="${safe(item.resumeName)}">${safe(item.resumeName)}</td><td><div class="row-actions"><button class="download" type="button">Download</button><button class="delete" type="button">Delete</button></div></td>`;
+    row.innerHTML = `<td class="row-number">${index + 1}</td><td><strong class="candidate-name">${safe(item.candidateName)}</strong></td><td>${dateLabel(item.interviewDate)}</td><td>${timeLabel(item.startTime)}</td><td>${item.duration} min</td><td><div class="photo-preview"><span class="face-photo"><img src="${item.thumbnail}" alt="${safe(item.candidateName)} candidate photo" /></span><small title="${safe(item.photoName)}">${safe(item.photoName)}</small></div></td><td><div class="resume-cell"><span title="${safe(item.resumeName)}">${safe(item.resumeName)}</span><button class="download" type="button">↓ Download résumé</button></div></td><td><div class="row-actions"><button class="edit" type="button">Edit details</button><button class="delete" type="button">Delete</button></div></td>`;
     row.querySelector<HTMLButtonElement>(".download")!.onclick = () => downloadResume(item);
+    row.querySelector<HTMLButtonElement>(".edit")!.onclick = () => openDialog(item);
     row.querySelector<HTMLButtonElement>(".delete")!.onclick = () => removeInterview(item);
     rows.append(row);
   });
@@ -83,9 +85,25 @@ async function load() {
   }
 }
 
-function openDialog() {
+function openDialog(item: Interview | null = null) {
   form.reset();
+  editing = item;
   get("dialogMessage").textContent = "";
+  get("dialogKicker").textContent = item ? "UPDATE RECORD" : "NEW RECORD";
+  get("dialogTitle").textContent = item ? "Update interview details" : "Add an interview";
+  get("dialogDescription").textContent = item ? "Change the schedule or replace the saved photo and résumé." : "Candidate details will appear as a new row in your ledger.";
+  submitButton.textContent = item ? "Update details" : "Save to ledger";
+  photoInput.required = !item;
+  resumeInput.required = !item;
+  get("photoHelp").textContent = item ? `Current: ${item.photoName} · choose a file only to replace it` : "JPG, PNG or WebP · max 10 MB";
+  get("resumeHelp").textContent = item ? `Current: ${item.resumeName} · choose a file only to replace it` : "PDF, DOC or DOCX · max 10 MB";
+  if (item) {
+    nameInput.value = item.candidateName;
+    dateInput.value = item.interviewDate;
+    timeInput.value = item.startTime;
+    durationInput.value = String(item.duration);
+    consentInput.checked = true;
+  }
   dialog.showModal();
   nameInput.focus();
 }
@@ -111,25 +129,30 @@ async function save(event: SubmitEvent) {
   const photo = photoInput.files?.[0];
   const resume = resumeInput.files?.[0];
   const message = get("dialogMessage");
-  if (!nameInput.value.trim() || !dateInput.value || !timeInput.value || !durationInput.value || !photo || !resume || !consentInput.checked) {
+  if (!nameInput.value.trim() || !dateInput.value || !timeInput.value || !durationInput.value || (!editing && (!photo || !resume)) || !consentInput.checked) {
     message.textContent = "Complete every field and confirm permission to store the files.";
     return;
   }
-  if (dateInput.value < today || photo.size > 10 * 1024 * 1024 || resume.size > 10 * 1024 * 1024) {
+  if (dateInput.value < today || (photo && photo.size > 10 * 1024 * 1024) || (resume && resume.size > 10 * 1024 * 1024)) {
     message.textContent = "Use a current/future date and files no larger than 10 MB.";
     return;
   }
   submitButton.disabled = true;
   message.textContent = "Saving candidate and files…";
   try {
-    await request("/api/interviews", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+    const payload: Record<string, unknown> = {
       candidateName: nameInput.value.trim(), interviewDate: dateInput.value, startTime: timeInput.value,
-      duration: Number(durationInput.value), photoName: photo.name, photoMime: mime(photo, "photo"), photoData: await toBase64(photo),
-      resumeName: resume.name, resumeMime: mime(resume, "resume"), resumeData: await toBase64(resume),
-    }) });
+      duration: Number(durationInput.value),
+    };
+    if (photo) Object.assign(payload, { photoName: photo.name, photoMime: mime(photo, "photo"), photoData: await toBase64(photo) });
+    if (resume) Object.assign(payload, { resumeName: resume.name, resumeMime: mime(resume, "resume"), resumeData: await toBase64(resume) });
+    await request(editing ? `/api/interviews/${encodeURIComponent(editing.id)}` : "/api/interviews", {
+      method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+    });
     dialog.close();
     await load();
-    sheetMessage.textContent = "Interview saved successfully.";
+    sheetMessage.textContent = editing ? "Interview details updated successfully." : "Interview saved successfully.";
+    editing = null;
   } catch (error) {
     message.textContent = error instanceof Error ? error.message : "Could not save the interview.";
   } finally { submitButton.disabled = false; }
@@ -169,8 +192,8 @@ get<HTMLFormElement>("loginForm").onsubmit = async event => {
   catch (error) { credentials = ""; message.textContent = error instanceof Error ? error.message : "Login failed."; }
 };
 get("logoutButton").onclick = () => { credentials = ""; interviews = []; ledgerView.hidden = true; loginView.hidden = false; get<HTMLInputElement>("portalPassword").value = ""; };
-get("newInterviewButton").onclick = openDialog;
-get("emptyAddButton").onclick = openDialog;
+get("newInterviewButton").onclick = () => openDialog();
+get("emptyAddButton").onclick = () => openDialog();
 get("closeDialogButton").onclick = () => dialog.close();
 get("cancelDialogButton").onclick = () => dialog.close();
 get("refreshButton").onclick = load;

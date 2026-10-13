@@ -194,6 +194,29 @@ class InterviewStore:
                 raise HTTPException(404, "Interview not found.")
             return bytes(row["resume"]), row["resume_mime"], row["resume_name"]
 
+    def update(self, owner, interview_id, record):
+        with self.connection() as db:
+            current = db.execute("SELECT * FROM interviews WHERE owner=? AND id=?", (owner, interview_id)).fetchone()
+            if current is None:
+                raise HTTPException(404, "Interview not found.")
+            values = {
+                "candidate_name": record["candidateName"], "interview_date": record["interviewDate"],
+                "start_time": record["startTime"], "duration": record["duration"],
+                "photo_name": record.get("photoName", current["photo_name"]),
+                "photo_mime": record.get("photoMime", current["photo_mime"]),
+                "photo": record.get("photo", current["photo"]),
+                "thumbnail": record.get("thumbnail", current["thumbnail"]),
+                "resume_name": record.get("resumeName", current["resume_name"]),
+                "resume_mime": record.get("resumeMime", current["resume_mime"]),
+                "resume": record.get("resume", current["resume"]),
+            }
+            db.execute("""UPDATE interviews SET candidate_name=:candidate_name, interview_date=:interview_date,
+                start_time=:start_time, duration=:duration, photo_name=:photo_name, photo_mime=:photo_mime,
+                photo=:photo, thumbnail=:thumbnail, resume_name=:resume_name, resume_mime=:resume_mime,
+                resume=:resume WHERE owner=:owner AND id=:id""", {**values, "owner": owner, "id": interview_id})
+            row = db.execute("SELECT * FROM interviews WHERE id=?", (interview_id,)).fetchone()
+            return self.metadata(row)
+
     def delete(self, owner, interview_id):
         with self.connection() as db:
             if db.execute("DELETE FROM interviews WHERE owner=? AND id=?", (owner, interview_id)).rowcount == 0:
@@ -318,6 +341,48 @@ def register_interview_routes(app, access_keys):
         return Response(workbook,
                         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         headers={"Content-Disposition": 'attachment; filename="bluqq-interviews.xlsx"'})
+
+    @app.patch("/api/interviews/{interview_id}")
+    async def update_interview(interview_id: str, request: Request):
+        owner = authenticate(request)
+        check_id(interview_id)
+        if request.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
+            raise HTTPException(415, "Send interview details as JSON.")
+        try:
+            payload = await request.json()
+        except (ValueError, UnicodeDecodeError):
+            raise HTTPException(400, "Interview details could not be read.") from None
+        name, interview_date = payload.get("candidateName"), payload.get("interviewDate")
+        start_time, duration = payload.get("startTime"), payload.get("duration")
+        if not isinstance(name, str) or not 1 <= len(name.strip()) <= 100 or any(ord(c) < 32 for c in name):
+            raise HTTPException(400, "Enter a valid candidate name.")
+        try:
+            parsed_date = date.fromisoformat(interview_date)
+        except (TypeError, ValueError):
+            raise HTTPException(400, "Choose a valid interview date.") from None
+        if parsed_date.year > date.today().year + 3:
+            raise HTTPException(400, "Interview date is too far in the future.")
+        if not isinstance(start_time, str) or not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", start_time):
+            raise HTTPException(400, "Choose a valid start time.")
+        if type(duration) is not int or duration not in {15, 30, 45, 60, 90}:
+            raise HTTPException(400, "Choose a valid interview duration.")
+        record = {"candidateName": name.strip(), "interviewDate": interview_date, "startTime": start_time, "duration": duration}
+        if payload.get("photoData") is not None:
+            photo_name, photo_mime = payload.get("photoName"), payload.get("photoMime")
+            if not isinstance(photo_name, str) or not 1 <= len(photo_name) <= 160 or photo_mime not in PHOTO_MIMES:
+                raise HTTPException(400, "Use a valid photo.")
+            photo = decode_file(payload.get("photoData"), MAX_PHOTO_BYTES, "Photo")
+            _, _, _, thumbnail = validate_image(photo, photo_mime)
+            record.update(photoName=photo_name, photoMime=photo_mime, photo=photo, thumbnail=thumbnail)
+        if payload.get("resumeData") is not None:
+            resume_name, resume_mime = payload.get("resumeName"), payload.get("resumeMime")
+            if not isinstance(resume_name, str) or not 1 <= len(resume_name) <= 160 or resume_mime not in RESUME_MIMES:
+                raise HTTPException(400, "Use a valid résumé.")
+            resume = decode_file(payload.get("resumeData"), MAX_RESUME_BYTES, "Résumé")
+            validate_resume(resume, resume_mime, resume_name)
+            record.update(resumeName=resume_name, resumeMime=resume_mime, resume=resume)
+        async with save_lock:
+            return await run_in_threadpool(store.update, owner, interview_id, record)
 
     @app.get("/api/interviews/{interview_id}/resume")
     async def download_resume(interview_id: str, request: Request):

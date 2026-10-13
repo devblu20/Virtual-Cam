@@ -53,16 +53,24 @@ input:focus, select:focus { border-color: #5d88ff; box-shadow: 0 0 0 3px #e4ecff
 .search-box { display: flex; align-items: center; gap: 7px; width: min(270px, 100%); padding-left: 11px; border: 1px solid #dce3ec; border-radius: 9px; color: #8b96a7; }
 .search-box input { padding: 9px 9px 9px 0; border: 0; box-shadow: none; }
 .table-wrap { overflow-x: auto; }
-table { width: 100%; min-width: 1050px; border-collapse: collapse; table-layout: fixed; }
+table { width: 100%; min-width: 1220px; border-collapse: collapse; table-layout: fixed; }
 th, td { padding: 12px 13px; border-right: 1px solid #e4e9f0; border-bottom: 1px solid #e4e9f0; overflow: hidden; color: #3d4a5e; font-size: 11px; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 th { background: #f5f7fa; color: #657287; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
 th:last-child, td:last-child { border-right: 0; }
 .row-number { width: 46px; color: #8792a3; text-align: center; }
-.candidate-cell { display: flex; align-items: center; gap: 9px; }
-.candidate-cell img { width: 34px; height: 34px; flex: 0 0 auto; border-radius: 8px; object-fit: cover; }
-.candidate-cell strong { overflow: hidden; color: #1c283b; text-overflow: ellipsis; }
-.row-actions { display: flex; gap: 6px; }
+.candidate-name { color: #1c283b; }
+.photo-column { width: 150px; }
+.actions-column { width: 150px; }
+.photo-preview { display: flex; align-items: center; gap: 9px; }
+.face-photo { position: relative; width: 62px; height: 72px; flex: 0 0 auto; overflow: hidden; border: 1px solid #dce4ef; border-radius: 10px; background: #eef2f7; }
+.face-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; transform: scale(1.7); transform-origin: 50% 21%; }
+.photo-preview small { max-width: 66px; overflow: hidden; color: #7a8799; font-size: 9px; font-weight: 600; text-overflow: ellipsis; }
+.resume-cell { display: grid; gap: 7px; }
+.resume-cell span { overflow: hidden; color: #667489; font-size: 9px; text-overflow: ellipsis; }
+.resume-cell button { justify-self: start; padding: 7px 9px; border: 1px solid #bad0ff; border-radius: 7px; background: #eff5ff; color: #1e5eff; font-size: 9px; font-weight: 750; }
+.row-actions { display: grid; gap: 6px; }
 .row-actions button { padding: 6px 8px; border: 1px solid #d6deea; border-radius: 7px; background: #fff; color: #425067; font-size: 9px; }
+.row-actions .edit { border-color: #bdd0ff; color: #1e5eff; }
 .row-actions .delete { color: #c43c4e; }
 .empty-state { display: grid; justify-items: center; padding: 64px 20px; text-align: center; }
 .empty-state > span { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px; background: #edf3ff; color: #1e5eff; font-size: 24px; }

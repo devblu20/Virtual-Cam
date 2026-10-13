@@ -43,7 +43,7 @@
           <div class="sheet-toolbar"><div><span class="sheet-icon">▦</span><div><b>Interview data</b><small>Live Excel-style register</small></div></div><label class="search-box">⌕<input id="searchInput" type="search" placeholder="Search candidates" /></label></div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th class="row-number">#</th><th>Candidate</th><th>Interview date</th><th>Start time</th><th>Duration</th><th>Photo</th><th>Résumé</th><th>Actions</th></tr></thead>
+              <thead><tr><th class="row-number">#</th><th>Candidate</th><th>Interview date</th><th>Start time</th><th>Duration</th><th class="photo-column">Photo</th><th>Résumé</th><th class="actions-column">Actions</th></tr></thead>
               <tbody id="ledgerRows"></tbody>
             </table>
           </div>
@@ -56,15 +56,15 @@
 
     <dialog id="interviewDialog">
       <form class="dialog-card" id="ledgerForm" method="dialog">
-        <div class="dialog-heading"><div><p class="kicker">NEW RECORD</p><h2>Add an interview</h2><p>Candidate details will appear as a new row in your ledger.</p></div><button class="close-button" id="closeDialogButton" type="button" aria-label="Close">×</button></div>
+        <div class="dialog-heading"><div><p class="kicker" id="dialogKicker">NEW RECORD</p><h2 id="dialogTitle">Add an interview</h2><p id="dialogDescription">Candidate details will appear as a new row in your ledger.</p></div><button class="close-button" id="closeDialogButton" type="button" aria-label="Close">×</button></div>
         <div class="form-grid">
           <label class="full">Candidate name<input id="ledgerName" type="text" maxlength="100" placeholder="Full name" required /></label>
           <label>Interview date<input id="ledgerDate" type="date" required /></label>
           <label>Start time<input id="ledgerTime" type="time" required /></label>
           <label>Duration<select id="ledgerDuration" required><option value="">Choose duration</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60">1 hour</option><option value="90">1 hour 30 minutes</option></select></label>
           <span></span>
-          <label class="file-field">Candidate photo<input id="ledgerPhoto" type="file" accept="image/jpeg,image/png,image/webp" required /><small>JPG, PNG or WebP · max 10 MB</small></label>
-          <label class="file-field">Résumé<input id="ledgerResume" type="file" accept=".pdf,.doc,.docx" required /><small>PDF, DOC or DOCX · max 10 MB</small></label>
+          <label class="file-field">Candidate photo<input id="ledgerPhoto" type="file" accept="image/jpeg,image/png,image/webp" required /><small id="photoHelp">JPG, PNG or WebP · max 10 MB</small></label>
+          <label class="file-field">Résumé<input id="ledgerResume" type="file" accept=".pdf,.doc,.docx" required /><small id="resumeHelp">PDF, DOC or DOCX · max 10 MB</small></label>
         </div>
         <label class="consent"><input id="ledgerConsent" type="checkbox" required /><span>I have permission to store this candidate’s information and files.</span></label>
         <p class="message" id="dialogMessage" aria-live="polite"></p>
