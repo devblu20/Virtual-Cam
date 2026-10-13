@@ -2,7 +2,7 @@ FROM node:24-bookworm-slim AS frontend
 WORKDIR /build
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
-COPY tsconfig.json index.html ./
+COPY tsconfig.json vite.config.js index.html interview.html ./
 COPY src ./src
 COPY public ./public
 RUN npm run typecheck && npm run build
