@@ -32,6 +32,20 @@
 
       <div class="workspace-grid">
         <form class="setup-card" id="interviewForm" novalidate>
+          <section class="form-section access-section">
+            <div class="section-heading">
+              <span>00</span>
+              <div><h2>Private access</h2><p>Use your Virtual CAM personal key to save and retrieve interviews.</p></div>
+            </div>
+            <div class="key-row">
+              <label class="field" for="accessKey">
+                <span>Personal access key</span>
+                <input id="accessKey" name="accessKey" type="password" autocomplete="off" spellcheck="false" placeholder="Enter your Bluqq personal key" required />
+                <small class="field-error" id="keyError"></small>
+              </label>
+              <button class="secondary load-button" id="loadInterviewsButton" type="button">Load saved</button>
+            </div>
+          </section>
           <section class="form-section">
             <div class="section-heading">
               <span>01</span>
@@ -101,9 +115,14 @@
             <p class="files-error" id="filesError" aria-live="polite"></p>
           </section>
 
+          <label class="consent-row">
+            <input id="storageConsent" type="checkbox" required />
+            <span>I have permission to store this candidate’s details, photo and résumé in my private interview library.</span>
+          </label>
+
           <div class="form-actions">
             <button class="secondary" id="clearButton" type="button">Clear form</button>
-            <button class="primary" type="submit">Review interview <span aria-hidden="true">→</span></button>
+            <button class="primary" id="saveButton" type="submit">Save interview <span aria-hidden="true">→</span></button>
           </div>
           <p class="form-message" id="formMessage" aria-live="polite"></p>
         </form>
@@ -127,9 +146,18 @@
             <span aria-hidden="true">▤</span>
             <div><small>Résumé</small><strong id="summaryResume">Not uploaded</strong></div>
           </div>
-          <p class="privacy-note">Files stay on this page while you prepare the interview and are not uploaded by this form.</p>
+          <p class="privacy-note">After you save, these details and files are stored in the private Railway library connected to your personal access key.</p>
         </aside>
       </div>
+
+      <section class="saved-section" id="savedSection" aria-labelledby="savedTitle">
+        <div class="saved-heading">
+          <div><p class="eyebrow">PRIVATE LIBRARY</p><h2 id="savedTitle">Saved interviews</h2><p>Up to 50 interviews for each personal access key.</p></div>
+          <button class="secondary" id="refreshInterviewsButton" type="button">Refresh list</button>
+        </div>
+        <p class="saved-message" id="savedMessage" aria-live="polite">Enter your personal access key and press Load saved.</p>
+        <div class="saved-grid" id="savedGrid"></div>
+      </section>
 
       <footer>Interview Studio — A product by <strong>Bluqq</strong></footer>
     </main>

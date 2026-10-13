@@ -25,6 +25,7 @@ from reference_library import register_reference_routes
 from usage_history import register_usage_routes, small_json, usage_metadata
 from starlette.concurrency import run_in_threadpool
 from processing_config import load_processing_config
+from interview_store import register_interview_routes
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
@@ -332,6 +333,7 @@ def create_app() -> FastAPI:
             raise HTTPException(502, "Reference image editing failed. Try again.") from None
 
     register_reference_routes(app, access_keys)
+    register_interview_routes(app, access_keys)
 
     if dist.is_dir():
         app.mount("/", StaticFiles(directory=dist, html=True), name="frontend")

@@ -46,9 +46,11 @@ button, input, select { font: inherit; }
 .upload-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .field { display: grid; gap: 8px; }
 .field > span { color: #d9e0ed; font-size: 13px; font-weight: 700; }
-input[type="text"], input[type="date"], input[type="time"], select { width: 100%; min-width: 0; padding: 13px 14px; border: 1px solid #303a50; border-radius: 10px; background: #090d16; color: #eef2fa; color-scheme: dark; }
+input[type="text"], input[type="password"], input[type="date"], input[type="time"], select { width: 100%; min-width: 0; padding: 13px 14px; border: 1px solid #303a50; border-radius: 10px; background: #090d16; color: #eef2fa; color-scheme: dark; }
 input::placeholder { color: #748198; }
 input:focus, select:focus { border-color: #6483ff; box-shadow: 0 0 0 3px rgba(100, 131, 255, .14); outline: 0; }
+.key-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: end; }
+.load-button { margin-bottom: 24px; white-space: nowrap; }
 .field-error, .files-error { min-height: 16px; color: #ff9aaa; font-size: 11px; line-height: 1.4; }
 .upload-card { position: relative; display: grid; justify-items: center; align-content: center; min-height: 230px; padding: 22px; border: 1px dashed #40516c; border-radius: 14px; background: #0a101a; text-align: center; cursor: pointer; transition: border-color 140ms ease, background 140ms ease, transform 140ms ease; }
 .upload-card:hover { transform: translateY(-2px); border-color: #6a87b4; background: #0d1623; }
@@ -60,6 +62,8 @@ input:focus, select:focus { border-color: #6483ff; box-shadow: 0 0 0 3px rgba(10
 .upload-card b { padding: 8px 12px; border: 1px solid #3b4a62; border-radius: 8px; background: #192437; color: #dce8fb; font-size: 11px; }
 .file-name { width: 100%; margin-top: 12px; overflow: hidden; color: #a9b8cd; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .files-error { display: block; margin: 8px 0 0; }
+.consent-row { display: flex; align-items: flex-start; gap: 10px; padding: 20px 28px 0; color: #aebbd0; font-size: 12px; line-height: 1.55; }
+.consent-row input { width: 16px; height: 16px; flex: 0 0 auto; margin: 2px 0 0; accent-color: #6483ff; }
 .form-actions { display: flex; justify-content: flex-end; gap: 10px; padding: 22px 28px 8px; }
 button { padding: 12px 17px; border: 1px solid #334059; border-radius: 10px; color: white; cursor: pointer; }
 button:hover { transform: translateY(-1px); }
@@ -89,8 +93,27 @@ button:hover { transform: translateY(-1px); }
 .resume-summary div { display: grid; gap: 4px; min-width: 0; }
 .resume-summary strong { overflow: hidden; color: #dce5f2; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .privacy-note { margin: 15px 2px 0; color: #7f8da3; font-size: 10px; line-height: 1.6; }
+.saved-section { margin-top: 24px; padding: 26px; border: 1px solid #2b3b4c; border-radius: 20px; background: rgba(14, 22, 32, .94); }
+.saved-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.saved-heading .eyebrow { margin: 0 0 7px; }
+.saved-heading h2 { margin: 0 0 5px; font-size: 22px; letter-spacing: -.03em; }
+.saved-heading p:last-child { margin: 0; color: #8f9db2; font-size: 12px; }
+.saved-message { margin: 20px 0 0; padding: 13px 15px; border: 1px solid #2d405a; border-radius: 10px; background: #111c2b; color: #adbed4; font-size: 12px; }
+.saved-message[data-tone="error"] { border-color: #71414c; background: #2b1923; color: #ffd0d5; }
+.saved-message[data-tone="success"] { border-color: #335848; background: #14291f; color: #b9ebd8; }
+.saved-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; margin-top: 16px; }
+.saved-interview { overflow: hidden; border: 1px solid #303e52; border-radius: 14px; background: #0b121d; }
+.saved-interview-top { display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: 13px; padding: 13px; }
+.saved-interview img { width: 86px; height: 104px; border-radius: 9px; background: #05080d; object-fit: cover; }
+.saved-interview-copy { min-width: 0; }
+.saved-interview-copy h3 { margin: 3px 0 9px; overflow-wrap: anywhere; color: #e6edf8; font-size: 15px; }
+.saved-interview-copy p { margin: 5px 0; color: #9dacbf; font-size: 11px; }
+.saved-interview-copy .resume-name { overflow: hidden; color: #b7c8dc; text-overflow: ellipsis; white-space: nowrap; }
+.saved-actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 0 13px 13px; }
+.saved-actions button { padding: 9px 11px; font-size: 11px; }
+.delete-button { border-color: #59313c; background: #25151a; color: #ff9aaa; }
 footer { margin-top: 26px; padding-top: 20px; border-top: 1px solid #20293a; color: #7f8da3; font-size: 11px; text-align: center; }
 @media (max-width: 900px) { .workspace-grid { grid-template-columns: 1fr; } .summary-card { position: static; } .photo-preview { max-height: 440px; } }
-@media (max-width: 680px) { .interview-shell { width: calc(100% - 24px); padding-top: 18px; } .interview-header, .page-intro { align-items: flex-start; } .page-intro { flex-direction: column; padding-top: 30px; } .three-columns, .upload-grid { grid-template-columns: 1fr; } .form-section { padding: 22px 18px; } .form-actions { padding-inline: 18px; } .form-message { padding-inline: 18px; } }
+@media (max-width: 680px) { .interview-shell { width: calc(100% - 24px); padding-top: 18px; } .interview-header, .page-intro { align-items: flex-start; } .page-intro { flex-direction: column; padding-top: 30px; } .three-columns, .upload-grid, .key-row { grid-template-columns: 1fr; } .load-button { margin: 0; } .form-section { padding: 22px 18px; } .consent-row, .form-actions { padding-inline: 18px; } .form-message { padding-inline: 18px; } .saved-heading { align-items: flex-start; flex-direction: column; } }
 @media (max-width: 460px) { .interview-header { flex-direction: column; } .back-link { padding-left: 0; } .form-actions { flex-direction: column-reverse; } .form-actions button { width: 100%; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }
