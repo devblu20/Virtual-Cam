@@ -2,8 +2,8 @@ import { createDecartClient, models, type RealTimeClient } from "@decartai/sdk";
 import "./style.css";
 import { UsageReporter, referenceMetadata } from "./usage";
 
-// Video profile from the supplied Bluqq ZIP (manifest version 0.3.8).
-// Keep initial connections and reference updates aligned. See EXTENSION_PARITY.md.
+// Website Lucy 2.5 trial; extension configuration remains on Lucy 2.1.
+// The v2 contract supplies the assigned prompt; website model options are separate.
 // Personal prompts are assigned by access-key user ID on Railway.
 // Every new connection receives a validated, session-pinned text configuration.
 type ProcessingConfig = { schemaVersion: 2; prompt: string; revision: string; userId: string; displayName: string; model: string; enhance: false };
@@ -20,10 +20,10 @@ function processingConfig(value: unknown): ProcessingConfig {
   }
   return { schemaVersion: 2, prompt: config.prompt, revision: config.revision, userId: config.userId, displayName: config.displayName, model: config.model, enhance: false };
 }
-const EXTENSION_MODEL = "lucy-2.1";
+const WEBSITE_MODEL = "lucy-2.5";
 const CAMERA_FPS = 25;
-// Keep the explicit identity/clothing instructions intact instead of rewriting them.
-const ENHANCE_PROMPT = false;
+// Decart recommends enhancement for Lucy 2.5 structured prompts.
+const ENHANCE_PROMPT = true;
 
 const el = <T extends HTMLElement>(id: string) => document.querySelector<T>("#" + id)!;
 const inputVideo = el<HTMLVideoElement>("inputVideo");
@@ -84,7 +84,7 @@ let diagnosticToken = "";
 let loadedDefaultPrompt = "";
 
 function model() {
-  return models.realtime(EXTENSION_MODEL);
+  return models.realtime(WEBSITE_MODEL);
 }
 function syncReferenceState() {
   referenceState.textContent = checkingReference ? "Checking image locally…"
@@ -401,7 +401,7 @@ function updateOutputDetails() {
   const target = model();
   const belowTarget = !!(width && height && width * height < target.width * target.height);
   outputDetails.textContent = width && height
-    ? `Received: ${width} × ${height} · Lucy 2.1${belowTarget ? " — lower pixel count than the model input; inspect output detail." : ""}`
+    ? `Received: ${width} × ${height} · Lucy 2.5${belowTarget ? " — lower pixel count than the model input; inspect output detail." : ""}`
     : "Output: provider default, matching the extension · Waiting for decoded video dimensions…";
   outputDetails.dataset.tone = belowTarget ? "warning" : "idle";
 }
@@ -668,7 +668,7 @@ async function fetchToken(signal: AbortSignal, reporter: UsageReporter, referenc
   const response = await fetch("/api/realtime-token", {
     method: "POST",
     headers: { Authorization: "Bearer " + accessKey.value.trim(), "Content-Type": "application/json" },
-    body: JSON.stringify({ processingConfigVersion: 2, usage: { source: "website", platform: "website", version: "managed-prompts-0.4.1", avatar } }),
+    body: JSON.stringify({ processingConfigVersion: 2, usage: { source: "website", platform: "website", version: "website-lucy-2.5-enhanced", avatar } }),
     cache: "no-store", credentials: "omit", redirect: "error",
     signal,
   });

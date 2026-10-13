@@ -278,12 +278,12 @@ test("website uses Bluqq branding without editable prompt controls", () => {
   assert.doesNotMatch(html, /id="(?:promptInput|enhanceInput)"/);
   assert.match(html, /agree to send my camera video, reference image, and Bluqq's server-provided prompt/);
   assert.match(html, /AI-generated video/);
-  assert.match(html, /extension 0\.4\.1 compatible · Lucy 2\.1/);
+  assert.match(html, /Lucy 2\.5 test · prompt enhancement on/);
   assert.doesNotMatch(html, /id="(?:modelSelect|resolutionSelect)"/);
   assert.match(html, /upload the same portrait/);
 });
 
-test("server prompt is pinned for connection and reference updates without enhancement", async () => {
+test("server prompt is pinned for Lucy 2.5 connection and reference updates with enhancement", async () => {
   const h = harness();
   try {
     await h.click("cameraButton");
@@ -293,13 +293,13 @@ test("server prompt is pinned for connection and reference updates without enhan
     assert.equal(initial.text, processingConfig.prompt);
     assert.match(h.el("promptStatus").textContent, /Krishna/);
     assert.equal(JSON.parse(h.calls.fetch[0][1].body).processingConfigVersion, 2);
-    assert.equal(initial.enhance, false);
+    assert.equal(initial.enhance, true);
     assert.equal(h.calls.decart[0][1].initialState.image, h.el("referenceInput").files[0]);
     assert.match(h.el("referenceState").textContent, /Reference applied/);
     await h.click("updateButton");
     assert.equal(h.calls.updates.length, 1);
     assert.equal(h.calls.updates[0].prompt, initial.text);
-    assert.equal(h.calls.updates[0].enhance, false);
+    assert.equal(h.calls.updates[0].enhance, true);
     assert.equal(h.calls.updates[0].image, h.el("referenceInput").files[0]);
   } finally { h.cleanup(); }
 });
@@ -404,17 +404,17 @@ test("double connect does not create multiple sessions", async () => {
   } finally { h.cleanup(); }
 });
 
-test("video requests match the supplied extension model, ideal dimensions, fps and mirroring", async () => {
+test("website requests Lucy 2.5 at 720p while retaining capture fps and mirroring", async () => {
   const h = harness();
   try {
     await h.click("cameraButton");
-    assert.equal(h.calls.camera[0][0].video.width.ideal, extensionProfile.width);
-    assert.equal(h.calls.camera[0][0].video.height.ideal, extensionProfile.height);
+    assert.equal(h.calls.camera[0][0].video.width.ideal, 1280);
+    assert.equal(h.calls.camera[0][0].video.height.ideal, 720);
     assert.equal(h.calls.camera[0][0].video.frameRate.ideal, extensionProfile.frameRate);
     assert.equal(h.calls.camera[0][0].video.frameRate.max, extensionProfile.frameRate);
     assert.equal(h.calls.camera[0][0].audio, false);
     await h.click("connectButton");
-    assert.equal(h.calls.decart[0][1].model.name, extensionProfile.model);
+    assert.equal(h.calls.decart[0][1].model.name, "lucy-2.5");
     assert.equal(h.calls.decart[0][1].mirror, extensionProfile.mirror);
     assert.equal(Object.hasOwn(h.calls.decart[0][1], "resolution"), false);
     assert.equal(h.calls.clients[0].telemetry, false);
@@ -434,7 +434,7 @@ test("browser-negotiated low camera resolution is reported without another captu
   try {
     await h.click("cameraButton");
     assert.equal(h.calls.camera.length, 1);
-    assert.equal(h.calls.camera[0][0].video.width.ideal, 1088);
+    assert.equal(h.calls.camera[0][0].video.width.ideal, 1280);
     assert.match(h.el("cameraDetails").textContent, /640 × 480/);
     assert.equal(h.el("cameraDetails").dataset.tone, "warning");
   } finally { h.cleanup(); }
@@ -450,7 +450,7 @@ test("permission denial does not trigger a second camera request", async () => {
   } finally { h.cleanup(); }
 });
 
-test("switching camera stops the old stream and preserves the fixed extension video profile", async () => {
+test("switching camera stops the old stream and preserves the website Lucy 2.5 video profile", async () => {
   const h = harness();
   try {
     await h.click("cameraButton");
@@ -460,8 +460,8 @@ test("switching camera stops the old stream and preserves the fixed extension vi
     assert.equal(h.el("connectButton").disabled, true);
     await h.click("cameraButton");
     assert.equal(h.calls.camera[1][0].video.deviceId.exact, "camera-two");
-    assert.equal(h.calls.camera[1][0].video.width.ideal, 1088);
-    assert.equal(h.calls.camera[1][0].video.height.ideal, 624);
+    assert.equal(h.calls.camera[1][0].video.width.ideal, 1280);
+    assert.equal(h.calls.camera[1][0].video.height.ideal, 720);
   } finally { h.cleanup(); }
 });
 
@@ -558,7 +558,7 @@ test("diagnostics report real received dimensions and ignore stale network callb
     h.el("outputVideo").videoWidth = 1280;
     h.el("outputVideo").videoHeight = 720;
     h.el("outputVideo").listeners.resize();
-    assert.match(h.el("outputDetails").textContent, /Received: 1280 × 720 · Lucy 2\.1/);
+    assert.match(h.el("outputDetails").textContent, /Received: 1280 × 720 · Lucy 2\.5/);
     assert.equal(h.el("outputDetails").dataset.tone, "idle");
     h.el("outputVideo").videoWidth = 640;
     h.el("outputVideo").videoHeight = 360;
