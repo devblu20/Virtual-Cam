@@ -53,15 +53,15 @@ input:focus, select:focus { border-color: #5d88ff; box-shadow: 0 0 0 3px #e4ecff
 .search-box { display: flex; align-items: center; gap: 7px; width: min(270px, 100%); padding-left: 11px; border: 1px solid #dce3ec; border-radius: 9px; color: #8b96a7; }
 .search-box input { padding: 9px 9px 9px 0; border: 0; box-shadow: none; }
 .table-wrap { overflow-x: auto; }
-table { width: 100%; min-width: 1220px; border-collapse: collapse; table-layout: fixed; }
+table { width: 100%; min-width: 1080px; border-collapse: collapse; table-layout: fixed; }
 th, td { padding: 12px 13px; border-right: 1px solid #e4e9f0; border-bottom: 1px solid #e4e9f0; overflow: hidden; color: #3d4a5e; font-size: 11px; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 th { background: #f5f7fa; color: #657287; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
 th:last-child, td:last-child { border-right: 0; }
 .row-number { width: 46px; color: #8792a3; text-align: center; }
 .candidate-name { color: #1c283b; }
-.photo-column { width: 96px; text-align: center; }
+.candidate-column { width: 210px; }
+.candidate-cell { display: flex; align-items: center; gap: 13px; }
 .actions-column { width: 150px; }
-.photo-cell { text-align: center; }
 .face-photo { display: inline-grid; width: 58px; height: 58px; place-items: center; overflow: hidden; border: 3px solid #fff; border-radius: 16px; background: #eef2f7; box-shadow: 0 0 0 1px #d7e0ec, 0 5px 14px rgba(29, 53, 87, .13); }
 .face-photo img { width: 100%; height: 100%; object-fit: cover; }
 .resume-cell { display: grid; gap: 7px; }
