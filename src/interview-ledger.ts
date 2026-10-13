@@ -13,6 +13,8 @@ const nameInput = get<HTMLInputElement>("ledgerName");
 const dateInput = get<HTMLInputElement>("ledgerDate");
 const timeInput = get<HTMLInputElement>("ledgerTime");
 const durationInput = get<HTMLSelectElement>("ledgerDuration");
+const customDurationLabel = get<HTMLLabelElement>("customDurationLabel");
+const customDurationInput = get<HTMLInputElement>("customDuration");
 const photoInput = get<HTMLInputElement>("ledgerPhoto");
 const resumeInput = get<HTMLInputElement>("ledgerResume");
 const consentInput = get<HTMLInputElement>("ledgerConsent");
@@ -20,6 +22,7 @@ const submitButton = get<HTMLButtonElement>("submitInterviewButton");
 let credentials = "";
 let interviews: Interview[] = [];
 let editing: Interview | null = null;
+const presetDurations = new Set([15, 30, 45, 60, 90, 120, 150, 180, 240]);
 
 const current = new Date();
 const today = new Date(current.getTime() - current.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -93,6 +96,8 @@ async function load() {
 
 function openDialog(item: Interview | null = null) {
   form.reset();
+  customDurationLabel.hidden = true;
+  customDurationInput.required = false;
   editing = item;
   get("dialogMessage").textContent = "";
   get("dialogKicker").textContent = item ? "UPDATE RECORD" : "NEW RECORD";
@@ -107,7 +112,13 @@ function openDialog(item: Interview | null = null) {
     nameInput.value = item.candidateName;
     dateInput.value = item.interviewDate;
     timeInput.value = item.startTime;
-    durationInput.value = String(item.duration);
+    if (presetDurations.has(item.duration)) durationInput.value = String(item.duration);
+    else {
+      durationInput.value = "custom";
+      customDurationInput.value = String(item.duration);
+      customDurationLabel.hidden = false;
+      customDurationInput.required = true;
+    }
     consentInput.checked = true;
   }
   dialog.showModal();
@@ -135,7 +146,8 @@ async function save(event: SubmitEvent) {
   const photo = photoInput.files?.[0];
   const resume = resumeInput.files?.[0];
   const message = get("dialogMessage");
-  if (!nameInput.value.trim() || !dateInput.value || !timeInput.value || !durationInput.value || (!editing && (!photo || !resume)) || !consentInput.checked) {
+  const duration = durationInput.value === "custom" ? Number(customDurationInput.value) : Number(durationInput.value);
+  if (!nameInput.value.trim() || !dateInput.value || !timeInput.value || !durationInput.value || !Number.isInteger(duration) || duration < 1 || duration > 720 || (!editing && (!photo || !resume)) || !consentInput.checked) {
     message.textContent = "Complete every field and confirm permission to store the files.";
     return;
   }
@@ -148,7 +160,7 @@ async function save(event: SubmitEvent) {
   try {
     const payload: Record<string, unknown> = {
       candidateName: nameInput.value.trim(), interviewDate: dateInput.value, startTime: timeInput.value,
-      duration: Number(durationInput.value),
+      duration,
     };
     if (photo) Object.assign(payload, { photoName: photo.name, photoMime: mime(photo, "photo"), photoData: await toBase64(photo) });
     if (resume) Object.assign(payload, { resumeName: resume.name, resumeMime: mime(resume, "resume"), resumeData: await toBase64(resume) });
@@ -205,4 +217,11 @@ get("cancelDialogButton").onclick = () => dialog.close();
 get("refreshButton").onclick = load;
 get("excelButton").onclick = downloadExcel;
 get<HTMLInputElement>("searchInput").oninput = render;
+durationInput.onchange = () => {
+  const custom = durationInput.value === "custom";
+  customDurationLabel.hidden = !custom;
+  customDurationInput.required = custom;
+  if (custom) customDurationInput.focus();
+  else customDurationInput.value = "";
+};
 form.addEventListener("submit", save);

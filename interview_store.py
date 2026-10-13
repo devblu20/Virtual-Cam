@@ -331,7 +331,7 @@ def register_interview_routes(app, access_keys):
             raise HTTPException(400, "Interview date is too far in the future.")
         if not isinstance(start_time, str) or not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", start_time):
             raise HTTPException(400, "Choose a valid start time.")
-        if type(duration) is not int or duration not in {15, 30, 45, 60, 90, 120, 150, 180, 240}:
+        if type(duration) is not int or not 1 <= duration <= 720:
             raise HTTPException(400, "Choose a valid interview duration.")
         photo_name, photo_mime = payload.get("photoName"), payload.get("photoMime")
         resume_name, resume_mime = payload.get("resumeName"), payload.get("resumeMime")
@@ -384,7 +384,7 @@ def register_interview_routes(app, access_keys):
             raise HTTPException(400, "Interview date is too far in the future.")
         if not isinstance(start_time, str) or not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", start_time):
             raise HTTPException(400, "Choose a valid start time.")
-        if type(duration) is not int or duration not in {15, 30, 45, 60, 90, 120, 150, 180, 240}:
+        if type(duration) is not int or not 1 <= duration <= 720:
             raise HTTPException(400, "Choose a valid interview duration.")
         record = {"candidateName": name.strip(), "interviewDate": interview_date, "startTime": start_time, "duration": duration}
         if payload.get("photoData") is not None:
