@@ -32,6 +32,7 @@ async function flush() { for (let i = 0; i < 6; i++) await new Promise(setImmedi
 function harness() {
   const elements = new Map();
   class Element {
+    classList = { toggle() {} };
     value = ""; checked = false; disabled = false; hidden = false;
     files = []; dataset = {}; listeners = {}; srcObject = null; videoWidth = 0; videoHeight = 0;
     addEventListener(name, cb) { this.listeners[name] = cb; }
@@ -472,8 +473,10 @@ test("tiny images are rejected before network processing", async () => {
     await h.click("connectButton");
     assert.equal(h.calls.fetch.length, 0);
     assert.match(h.el("referenceDetails").textContent, /at least 512/);
-    assert.equal(h.el("referencePreview").hidden, true);
-    assert.equal(h.urls.size, 0);
+    assert.equal(h.el("editedReferenceFigure").hidden, true);
+    // The current UI retains the original image for review, but cannot submit it.
+    assert.equal(h.el("referenceComparison").hidden, false);
+    assert.equal(h.urls.size, 1);
     assert.equal(h.calls.bitmapClosed, 2);
   } finally { h.cleanup(); }
 });
@@ -582,12 +585,12 @@ test("page cleanup releases reference URLs and prevents late preview resurrectio
   waiting.resolve({ width: 1024, height: 1024, close() { closed = true; } });
   await flush();
   assert.equal(h.urls.size, 0);
-  assert.equal(h.el("referencePreview").hidden, true);
+  assert.equal(h.el("editedReferenceFigure").hidden, true);
   assert.equal(closed, true);
 });
 
 test("video and reference previews keep the full frame rather than cropping hair and shoulders", () => {
   const css = readFileSync(new URL("../src/style.css", import.meta.url), "utf8");
   assert.match(css, /\.video-card video\s*\{[^}]*object-fit: contain/);
-  assert.match(css, /\.reference-review img\s*\{[^}]*object-fit: contain/);
+  assert.match(css, /\.reference-figure img\s*\{[^}]*object-fit: contain/);
 });

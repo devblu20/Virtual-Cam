@@ -1,6 +1,8 @@
 # Bluqq 0.4.1 — managed users and prompts
 
-This backend supports both the existing 0.3.21 extension and the new 0.4.1 extension. This release has been built and tested locally; it has not been deployed to Railway or submitted to the Chrome Web Store.
+This backend supports both the existing 0.3.21 extension and the new 0.4.1 extension. Deployment through GitHub main was verified on Railway on 14 October 2026: health and the managed-user page returned HTTP 200; unauthenticated configuration and admin requests were rejected. Chrome Web Store submission has not been performed.
+
+The latest production website and Interview Ledger changes were merged before deployment. The pre-release production v1 prompt is preserved. No production environment variables, credentials or user assignments were changed. An independent volume backup and authenticated production session tests were not available without administrator access; public endpoint checks do not establish those results.
 
 ## What changes
 
@@ -54,7 +56,7 @@ Use as a complete per-user prompt for controlled testing, not as a guarantee of 
 - Frontend: `npm run typecheck`, `npm run build`, and `node --test tests/test_frontend.mjs tests/test_admin_ui.mjs` — build passed, 42 tests passed.
 - Extension release: `node releases/v0.4.1/build.mjs` and `node --test releases/v0.4.1/test.mjs` — six release checks passed. Capture bundles match 0.3.21 apart from the MAIN token-to-prompt assignment; the isolated provider bundle is unchanged.
 - Chromium: unpacked 0.4.1 service worker loaded; access alarm registered; admin create/save/lock flow passed at desktop/mobile sizes with no page errors. Screenshots were inspected.
-- Live paid-provider video and production deployment remain untested in this release task.
+- Live paid-provider video, administrator-authenticated production writes and volume backup/restore remain untested. Public deployment checks succeeded as described above.
 
 ## Rollback
 
