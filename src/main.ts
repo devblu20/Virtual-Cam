@@ -173,14 +173,14 @@ async function cropPortraitFile(file: Blob, ratioName: string, outputName: strin
     const desiredHeight = Math.min(
       bitmap.height,
       bitmap.width / ratio,
-      Math.max(box.height / 0.205, box.width / (0.255 * ratio)),
+      Math.max(box.height / 0.193, box.width / (0.24 * ratio)),
     );
     sourceHeight = desiredHeight;
     sourceWidth = desiredHeight * ratio;
     sourceX = Math.min(Math.max(0, box.x + box.width / 2 - sourceWidth / 2), bitmap.width - sourceWidth);
     // Scale both headroom and the lower edge from the detected face, so close
     // portraits and full-body photos produce the same four-button composition.
-    sourceY = Math.min(Math.max(0, box.y - box.height * 1.10), bitmap.height - sourceHeight);
+    sourceY = Math.min(Math.max(0, box.y - box.height * 1.18), bitmap.height - sourceHeight);
   } else if (fourButtonCrop) {
     // Chromium does not expose FaceDetector on every Windows installation.
     // Use a deterministic upper-torso crop instead of retaining the full
