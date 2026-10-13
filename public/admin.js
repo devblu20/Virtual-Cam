@@ -69,6 +69,10 @@
     person.append(node("span", "cell-title", item.participant_name || "Name not provided"));
     small(person, item.participant_name ? "Self-reported · not verified" : "Older client or website session");
     person.append(node("span", "account-label", item.owner));
+    if (item.profile) {
+      small(person, 'Assigned user: ' + item.profile.display_name);
+      small(person, 'Prompt revision: ' + item.profile.prompt_revision.slice(0, 12));
+    }
     cell(row, "Platform").append(node("span", "cell-title", platformNames[item.platform] || "Unknown platform"));
     const avatars = cell(row, "Avatar");
     const avatarList = item.avatars || [];

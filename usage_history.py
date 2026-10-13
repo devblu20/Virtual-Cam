@@ -25,13 +25,13 @@ MAX_SESSIONS = 100_000
 PLATFORMS = {"website", "meet", "zoom", "teams"}
 
 
-async def small_json(request):
+async def small_json(request, maximum=4096):
     data = bytearray()
     try:
         async with asyncio.timeout(5):
             async for chunk in request.stream():
                 data.extend(chunk)
-                if len(data) > 4096:
+                if len(data) > maximum:
                     raise HTTPException(413, "Usage request is too large.")
         return json.loads(data) if data else None
     except (ValueError, UnicodeError):
@@ -109,6 +109,9 @@ class UsageStore(ReferenceStore):
           session_id TEXT NOT NULL, ordinal INTEGER NOT NULL, kind TEXT NOT NULL,
           avatar_id TEXT NOT NULL, name TEXT NOT NULL, selected REAL NOT NULL,
           seconds REAL NOT NULL DEFAULT 0, PRIMARY KEY(session_id, ordinal));
+        CREATE TABLE IF NOT EXISTS usage_profiles (
+          session_id TEXT PRIMARY KEY, display_name TEXT NOT NULL,
+          prompt_revision TEXT NOT NULL);
         """)
         # Additive migration: preserve all existing sessions and their ownership.
         # Recheck under the write lock so simultaneous first requests are safe.
@@ -132,7 +135,7 @@ class UsageStore(ReferenceStore):
                 return "library", row["id"], row["name"]
         return avatar["kind"], avatar["id"], avatar["name"]
 
-    def start(self, owner, metadata):
+    def start(self, owner, metadata, configuration=None):
         now, identifier = time.time(), str(uuid.uuid4())
         with self.connection() as db:
             self.schema(db)
@@ -143,6 +146,9 @@ class UsageStore(ReferenceStore):
             db.execute("INSERT INTO usage_sessions(id,owner,source,platform,client_version,created,last_seen,state,participant_name) VALUES(?,?,?,?,?,?,?,?,?)",
                        (identifier, owner, metadata["source"], metadata["platform"], metadata["version"], now, now, "connecting", metadata.get("participant_name")))
             db.execute("INSERT INTO usage_avatars(session_id,ordinal,kind,avatar_id,name,selected) VALUES(?,0,?,?,?,?)", (identifier, *avatar, now))
+            if configuration and configuration.get('schemaVersion') == 2:
+                db.execute('INSERT INTO usage_profiles VALUES(?,?,?)',
+                           (identifier, configuration['displayName'], configuration['revision']))
         return identifier
 
     def fail(self, identifier, reason):
@@ -200,6 +206,9 @@ class UsageStore(ReferenceStore):
                     item["state"] = "interrupted" if item["started"] is not None else "unconfirmed"
                 item["estimated"] = True
                 item["avatars"] = [dict(a) for a in db.execute("SELECT ordinal,kind,avatar_id,name,selected,seconds FROM usage_avatars WHERE session_id=? ORDER BY ordinal", (row["id"],))]
+                profile = db.execute('SELECT display_name,prompt_revision FROM usage_profiles WHERE session_id=?', (row['id'],)).fetchone()
+                if profile:
+                    item['profile'] = dict(profile)
                 items.append(item)
         return {"items": items, "total": totals[0], "seconds": totals[1], "users": totals[2], "offset": offset,
                 "limit": limit, "asOf": now, "durationBasis": "Server-timed client activity reports; estimates, not billable time."}

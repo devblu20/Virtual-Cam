@@ -22,6 +22,7 @@ from reference_library import register_reference_routes
 from usage_history import register_usage_routes, small_json, usage_metadata
 from starlette.concurrency import run_in_threadpool
 from processing_config import load_processing_config
+from managed_users import ManagedUsers, register_managed_routes
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
@@ -49,7 +50,7 @@ def load_access_keys() -> dict[str, str]:
 def create_app() -> FastAPI:
     app = FastAPI(title="Virtual CAM Cloud", docs_url=None, redoc_url=None, openapi_url=None)
     api_key = os.getenv("DECART_API_KEY", "").strip()
-    access_keys = load_access_keys()
+    access_keys = ManagedUsers(load_access_keys())
     dist = BASE_DIR / "dist"
     ready = bool(api_key and access_keys and (dist / "index.html").is_file())
     minute_requests: dict[str, deque[float]] = defaultdict(deque)
@@ -57,6 +58,7 @@ def create_app() -> FastAPI:
     global_requests: deque[float] = deque()
     quota_lock = asyncio.Lock()
     usage_store = register_usage_routes(app, access_keys)
+    register_managed_routes(app, access_keys)
 
     async def record_usage(method, *args):
         # An analytics outage must not stop a camera session. Never log input data.
@@ -94,7 +96,7 @@ def create_app() -> FastAPI:
             raise HTTPException(401, "Enter a valid personal access key.")
         candidate = hashlib.sha256(supplied.encode("utf-8")).hexdigest()
         user = None
-        for user_id, digest in access_keys.items():
+        for user_id, digest in await run_in_threadpool(lambda: list(access_keys.items())):
             if hmac.compare_digest(candidate, digest):
                 user = user_id
         if user is None:
@@ -104,9 +106,9 @@ def create_app() -> FastAPI:
         usage = usage_metadata(body)
         configuration = None
         if isinstance(body, dict) and "processingConfigVersion" in body:
-            if type(body["processingConfigVersion"]) is not int or body["processingConfigVersion"] != 1:
+            if type(body["processingConfigVersion"]) is not int or body["processingConfigVersion"] not in (1, 2):
                 raise HTTPException(400, "Unsupported processing configuration version.")
-            configuration = await run_in_threadpool(load_processing_config)
+            configuration = await run_in_threadpool(access_keys.config, user) if body["processingConfigVersion"] == 2 else await run_in_threadpool(load_processing_config)
 
         async with quota_lock:
             now = time.monotonic()
@@ -121,7 +123,7 @@ def create_app() -> FastAPI:
                                         headers={"Retry-After": str(retry)})
             for bucket, _, _ in limits:
                 bucket.append(now)
-        usage_id = await record_usage(usage_store.start, user, usage) if usage else None
+        usage_id = await record_usage(usage_store.start, user, usage, configuration) if usage else None
         try:
             async with asyncio.timeout(25):
                 async with DecartClient(api_key=api_key) as client:

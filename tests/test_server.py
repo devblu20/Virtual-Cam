@@ -98,7 +98,7 @@ class CloudTests(unittest.TestCase):
                 self.assertEqual(self.client.post("/api/realtime-token", headers=AUTH).status_code, 200)
 
     def test_unsupported_processing_config_version_is_rejected(self):
-        for version in [0, 2, True, "1", None]:
+        for version in [0, 3, True, "1", None]:
             response = self.client.post("/api/realtime-token", headers=AUTH, json={"processingConfigVersion": version})
             self.assertEqual(response.status_code, 400)
         self.sdk.assert_not_called()

@@ -1,0 +1,22 @@
+(() => {
+ 'use strict';
+ const $=id=>document.getElementById(id); let key='',data=null,current=null,busy=false,generation=0,controller=null;
+ const message=text=>{$('message').textContent=text;};
+ async function api(path,method='GET',body){
+   const response=await fetch('/api/admin/'+path,{method,headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),cache:'no-store',credentials:'omit',redirect:'error',signal:controller.signal});
+   const result=await response.json();if(!response.ok)throw Error(typeof result.detail==='string'?result.detail:'Request failed.');return result;
+ }
+ function lock(){generation++;controller?.abort();key='';data=current=null;$('adminKey').value='';$('issuedKey').value='';$('prompt').value='';$('defaultPrompt').value='';$('userList').replaceChildren();$('workspace').hidden=true;$('issued').hidden=true;$('edit').hidden=true;$('login').hidden=false;message('Locked.');}
+ async function action(work){if(busy)return;busy=true;const own=generation;document.querySelectorAll('button').forEach(b=>b.disabled=true);try{await work(own);}catch(e){if(own===generation)message(e.name==='AbortError'?'Request cancelled.':e.message);}finally{busy=false;document.querySelectorAll('button').forEach(b=>b.disabled=false);}}
+ function counts(){$('count').textContent=$('prompt').value.length+' / 1024 characters';$('defaultCount').textContent=$('defaultPrompt').value.length+' / 1024 characters';$('prompt').disabled=!$('custom').checked;}
+ function select(id){current=data.users.find(u=>u.id===id)||null;$('edit').hidden=!current;if(!current)return;$('userId').textContent=current.id;$('name').value=current.name;$('room').value=current.room;$('active').checked=!!current.active;$('custom').checked=current.prompt!==null;$('prompt').value=current.prompt??data.default.prompt;counts();}
+ async function load(own,selected=current?.id){const result=await api('users');if(own!==generation)return;data=result;$('userList').replaceChildren();for(const u of data.users){const o=document.createElement('option');o.value=u.id;o.textContent=u.name+(u.active?'':' (disabled)')+' · '+u.id.slice(0,8);$('userList').append(o);}$('defaultPrompt').value=data.default.prompt;$('workspace').hidden=false;$('login').hidden=true;if(selected&&data.users.some(u=>u.id===selected))$('userList').value=selected;select($('userList').value);counts();}
+ function showKey(value){$('issuedKey').value=value;$('issued').hidden=false;$('issued').scrollIntoView({block:'nearest'});}
+ $('login').onsubmit=e=>{e.preventDefault();key=$('adminKey').value.trim();controller=new AbortController();void action(async own=>{await load(own);if(own===generation){$('adminKey').value='';message('Ready. Select a user or create one.');}});};
+ $('refresh').onclick=()=>void action(async own=>{await load(own);message('Refreshed.');});$('lock').onclick=lock;$('hideKey').onclick=()=>{$('issuedKey').value='';$('issued').hidden=true;};
+ $('create').onsubmit=e=>{e.preventDefault();void action(async own=>{const r=await api('users','POST',{name:$('newName').value});if(own!==generation)return;showKey(r.accessKey);$('newName').value='';await load(own,r.user.id);message('User created. Save and privately share their key.');});};
+ $('edit').onsubmit=e=>{e.preventDefault();if(!current)return;void action(async own=>{await api('users/'+encodeURIComponent(current.id),'PUT',{revision:current.revision,name:$('name').value,active:$('active').checked,room:$('room').value,prompt:$('custom').checked?$('prompt').value:null});await load(own);message('Saved. Prompt changes apply on the next session.');});};
+ $('rotate').onclick=()=>{if(!current||!confirm('Replace this user’s key? Their previous key will stop working. Unsaved form edits are not applied.'))return;void action(async own=>{const r=await api('users/'+encodeURIComponent(current.id)+'/rotate-key','POST',{revision:current.revision});if(own!==generation)return;showKey(r.accessKey);await load(own);message('Key replaced. Save the new key before leaving.');});};
+ $('defaults').onsubmit=e=>{e.preventDefault();void action(async own=>{await api('default-prompt','PUT',{revision:data.default.revision,prompt:$('defaultPrompt').value});await load(own);message('Default saved for the next 0.4.1 sessions.');});};
+ $('userList').onchange=()=>select($('userList').value);$('custom').onchange=counts;$('prompt').oninput=counts;$('defaultPrompt').oninput=counts;window.addEventListener('pagehide',lock);
+})();
