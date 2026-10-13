@@ -15,6 +15,7 @@ from collections import defaultdict, deque
 from contextlib import contextmanager
 from datetime import date
 from pathlib import Path
+from xml.sax.saxutils import escape
 
 from fastapi import HTTPException, Request
 from fastapi.responses import Response
@@ -32,6 +33,50 @@ RESUME_MIMES = {
     "application/msword": "doc",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
 }
+def excel_column(number):
+    result = ""
+    while number:
+        number, remainder = divmod(number - 1, 26)
+        result = chr(65 + remainder) + result
+    return result
+
+
+def make_excel(rows):
+    headers = ["Candidate Name", "Interview Date", "Start Time", "Duration (minutes)",
+               "Photo Filename", "Resume Filename", "Saved At"]
+    values = [headers] + [[
+        row["candidate_name"], row["interview_date"], row["start_time"], row["duration"],
+        row["photo_name"], row["resume_name"], time.strftime("%Y-%m-%d %H:%M", time.localtime(row["created"])),
+    ] for row in rows]
+    sheet_rows = []
+    for row_number, row in enumerate(values, 1):
+        cells = []
+        for column_number, value in enumerate(row, 1):
+            reference = f"{excel_column(column_number)}{row_number}"
+            if isinstance(value, int):
+                cells.append(f'<c r="{reference}" s="{1 if row_number == 1 else 0}"><v>{value}</v></c>')
+            else:
+                cells.append(f'<c r="{reference}" t="inlineStr" s="{1 if row_number == 1 else 0}"><is><t>{escape(str(value))}</t></is></c>')
+        sheet_rows.append(f'<row r="{row_number}">{"".join(cells)}</row>')
+    sheet = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols>
+<col min="1" max="1" width="24" customWidth="1"/><col min="2" max="3" width="16" customWidth="1"/>
+<col min="4" max="4" width="19" customWidth="1"/><col min="5" max="7" width="28" customWidth="1"/>
+</cols><sheetData>{''.join(sheet_rows)}</sheetData><autoFilter ref="A1:G{max(1, len(values))}"/></worksheet>'''
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml", '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>''')
+        archive.writestr("_rels/.rels", '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>''')
+        archive.writestr("xl/workbook.xml", '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Interviews" sheetId="1" r:id="rId1"/></sheets></workbook>''')
+        archive.writestr("xl/_rels/workbook.xml.rels", '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>''')
+        archive.writestr("xl/styles.xml", '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Aptos"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Aptos"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF2563EB"/><bgColor indexed="64"/></patternFill></fill><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs></styleSheet>''')
+        archive.writestr("xl/worksheets/sheet1.xml", sheet)
+    return output.getvalue()
 
 
 def decode_file(value, maximum, label):
@@ -116,6 +161,13 @@ class InterviewStore:
                 ORDER BY interview_date,start_time,created DESC""", (owner,)).fetchall()
             return {"interviews": [self.metadata(row) for row in rows], "limit": MAX_INTERVIEWS}
 
+    def excel(self, owner):
+        with self.connection() as db:
+            rows = db.execute("""SELECT candidate_name,interview_date,start_time,duration,
+                photo_name,resume_name,created FROM interviews WHERE owner=?
+                ORDER BY interview_date,start_time,created DESC""", (owner,)).fetchall()
+            return make_excel(rows)
+
     def add(self, owner, record):
         with self.connection() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -155,6 +207,28 @@ def register_interview_routes(app, access_keys):
 
     def authenticate(request):
         authorization = request.headers.get("Authorization", "")
+        if authorization.startswith("Basic "):
+            try:
+                decoded = base64.b64decode(authorization[6:], validate=True).decode("utf-8")
+                portal_id, password = decoded.split(":", 1)
+            except (ValueError, UnicodeDecodeError):
+                raise HTTPException(401, "Enter a valid Interview Ledger ID and password.") from None
+            expected_id = os.getenv("INTERVIEW_PORTAL_ID", "").strip()
+            expected_hash = os.getenv("INTERVIEW_PORTAL_PASSWORD_SHA256", "").strip().lower()
+            if not expected_id or not re.fullmatch(r"[a-f0-9]{64}", expected_hash):
+                raise HTTPException(503, "Interview Ledger login is not configured yet.")
+            candidate_hash = hashlib.sha256(password.encode()).hexdigest()
+            if not (hmac.compare_digest(portal_id, expected_id) and hmac.compare_digest(candidate_hash, expected_hash)):
+                raise HTTPException(401, "Interview Ledger ID or password is incorrect.")
+            owner = "portal-" + hashlib.sha256(portal_id.encode()).hexdigest()[:24]
+            bucket = requests[owner]
+            now = time.monotonic()
+            while bucket and now - bucket[0] >= 60:
+                bucket.popleft()
+            if len(bucket) >= 90:
+                raise HTTPException(429, "Too many interview requests. Try again in a minute.")
+            bucket.append(now)
+            return owner
         supplied = authorization[7:] if authorization.startswith("Bearer ") else ""
         if not 32 <= len(supplied) <= 256:
             raise HTTPException(401, "Enter a valid personal access key.")
@@ -236,6 +310,14 @@ def register_interview_routes(app, access_keys):
             raise HTTPException(429, "Another interview is being saved. Try again shortly.")
         async with save_lock:
             return await run_in_threadpool(store.add, owner, record)
+
+    @app.get("/api/interviews/export.xlsx")
+    async def export_interviews(request: Request):
+        owner = authenticate(request)
+        workbook = await run_in_threadpool(store.excel, owner)
+        return Response(workbook,
+                        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers={"Content-Disposition": 'attachment; filename="bluqq-interviews.xlsx"'})
 
     @app.get("/api/interviews/{interview_id}/resume")
     async def download_resume(interview_id: str, request: Request):
