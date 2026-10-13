@@ -36,6 +36,24 @@ button { cursor: pointer; }
 .preview-stats div { display: grid; gap: 2px; padding: 8px 11px; border-radius: 10px; background: #f7f9fc; }
 .preview-stats strong { color: #17243a; font-size: 17px; }
 .preview-stats small { color: #8491a4; font-size: 8px; }
+.sheet-icon.mini { width: 26px; height: 26px; border-radius: 7px; font-size: 13px; }
+.mini-sheet { margin-top: 14px; overflow: hidden; border: 1px solid #dfe5ee; border-radius: 11px; }
+.mini-sheet-row { display: grid; grid-template-columns: 30px 1.6fr .8fr .9fr .7fr .7fr; align-items: center; min-height: 47px; border-bottom: 1px solid #e6ebf2; background: #fff; color: #566378; font-size: 8px; }
+.mini-sheet-row:last-child { border-bottom: 0; }
+.mini-sheet-row > span { display: flex; min-width: 0; height: 100%; align-items: center; gap: 8px; overflow: hidden; padding: 8px 9px; border-right: 1px solid #e6ebf2; text-overflow: ellipsis; white-space: nowrap; }
+.mini-sheet-row > span:last-child { border-right: 0; }
+.mini-sheet-head { min-height: 32px; background: #f3f6fa; color: #6e7b8e; font-size: 7px; font-weight: 850; letter-spacing: .06em; text-transform: uppercase; }
+.mini-sheet-head > span { background: #f3f6fa; }
+.mini-sheet-row b { overflow: hidden; color: #233148; font-size: 8px; text-overflow: ellipsis; }
+.mini-avatar { display: grid; width: 25px; height: 25px; flex: 0 0 auto; place-items: center; border-radius: 7px; color: #fff; font-size: 7px; font-style: normal; font-weight: 850; }
+.mini-avatar.blue { background: #3268e8; }
+.mini-avatar.purple { background: #9257df; }
+.mini-avatar.green { background: #1b9a5b; }
+.mini-sheet-row em { padding: 5px 7px; border-radius: 6px; background: #edf4ff; color: #2461dd; font-size: 7px; font-style: normal; font-weight: 800; }
+.sheet-tabs { display: flex; align-items: center; gap: 8px; margin-top: 11px; color: #8490a2; font-size: 8px; }
+.sheet-tabs span { padding: 7px 10px; border-radius: 7px; }
+.sheet-tabs .active { background: #e9f6ee; color: #187c48; font-weight: 800; }
+.sheet-tabs strong { margin-left: auto; color: #176f42; font-size: 8px; }
 .showcase-points { position: relative; z-index: 1; display: flex; gap: 18px; margin-top: 18px; color: #657389; font-size: 9px; font-weight: 700; }
 .showcase-points span::first-letter { color: #1e5eff; }
 .login-card { position: relative; width: min(440px, calc(100% - 48px)); margin: auto; overflow: hidden; padding: 44px; border: 1px solid #dce4f0; border-radius: 24px; background: #fff; box-shadow: 0 30px 90px rgba(40, 68, 115, .14); }
