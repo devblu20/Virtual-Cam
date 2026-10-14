@@ -87,7 +87,7 @@ function render() {
   emptyState.hidden = interviews.length > 0;
   if (interviews.length && !shown.length) sheetMessage.textContent = "No candidates match these filters.";
   get("totalCount").textContent = String(interviews.length);
-  get("upcomingCount").textContent = String(interviews.filter(item => item.interviewDate >= today).length);
+  get("upcomingCount").textContent = String(interviews.filter(item => item.status === "Scheduled" && item.interviewDate >= today).length);
   get("totalMinutes").textContent = `${interviews.reduce((sum, item) => sum + item.duration, 0)} min`;
 }
 
