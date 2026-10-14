@@ -28,6 +28,7 @@ MAX_PHOTO_BYTES = 10 * 1024 * 1024
 MAX_RESUME_BYTES = 10 * 1024 * 1024
 MAX_REQUEST_BYTES = 28 * 1024 * 1024
 MAX_INTERVIEWS = 50
+INTERVIEW_STATUSES = {"Scheduled", "Completed", "Selected", "Rejected", "Cancelled"}
 PHOTO_MIMES = {"image/jpeg", "image/png", "image/webp"}
 RESUME_MIMES = {
     "application/pdf": "pdf",
@@ -62,11 +63,12 @@ def excel_column(number):
 
 
 def make_excel(rows):
-    headers = ["Candidate Name", "Interview Date", "Start Time", "Duration (minutes)",
-               "Photo Filename", "Resume Filename", "Saved At"]
+    headers = ["Candidate Name", "Status", "Interview Date", "Start Time", "Duration (minutes)",
+               "Rating", "Interview Notes", "Photo Filename", "Resume Filename", "Saved At"]
     values = [headers] + [[
-        row["candidate_name"], row["interview_date"], row["start_time"], row["duration"],
-        row["photo_name"], row["resume_name"], time.strftime("%Y-%m-%d %H:%M", time.localtime(row["created"])),
+        row["candidate_name"], row["status"], row["interview_date"], row["start_time"], row["duration"],
+        row["rating"], row["notes"], row["photo_name"], row["resume_name"],
+        time.strftime("%Y-%m-%d %H:%M", time.localtime(row["created"])),
     ] for row in rows]
     sheet_rows = []
     for row_number, row in enumerate(values, 1):
@@ -80,9 +82,9 @@ def make_excel(rows):
         sheet_rows.append(f'<row r="{row_number}">{"".join(cells)}</row>')
     sheet = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols>
-<col min="1" max="1" width="24" customWidth="1"/><col min="2" max="3" width="16" customWidth="1"/>
-<col min="4" max="4" width="19" customWidth="1"/><col min="5" max="7" width="28" customWidth="1"/>
-</cols><sheetData>{''.join(sheet_rows)}</sheetData><autoFilter ref="A1:G{max(1, len(values))}"/></worksheet>'''
+<col min="1" max="2" width="22" customWidth="1"/><col min="3" max="6" width="16" customWidth="1"/>
+<col min="7" max="7" width="42" customWidth="1"/><col min="8" max="10" width="28" customWidth="1"/>
+</cols><sheetData>{''.join(sheet_rows)}</sheetData><autoFilter ref="A1:J{max(1, len(values))}"/></worksheet>'''
     output = io.BytesIO()
     with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("[Content_Types].xml", '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -155,6 +157,14 @@ class InterviewStore:
                 photo_name TEXT NOT NULL, photo_mime TEXT NOT NULL, photo BLOB NOT NULL, thumbnail BLOB NOT NULL,
                 resume_name TEXT NOT NULL, resume_mime TEXT NOT NULL, resume BLOB NOT NULL,
                 created INTEGER NOT NULL)""")
+            existing_columns = {row[1] for row in db.execute("PRAGMA table_info(interviews)")}
+            for column, definition in (
+                ("status", "TEXT NOT NULL DEFAULT 'Scheduled'"),
+                ("notes", "TEXT NOT NULL DEFAULT ''"),
+                ("rating", "INTEGER NOT NULL DEFAULT 0"),
+            ):
+                if column not in existing_columns:
+                    db.execute(f"ALTER TABLE interviews ADD COLUMN {column} {definition}")
             db.execute("CREATE INDEX IF NOT EXISTS interviews_owner ON interviews(owner)")
             with db:
                 yield db
@@ -171,20 +181,21 @@ class InterviewStore:
             "interviewDate": row["interview_date"], "startTime": row["start_time"],
             "duration": row["duration"], "photoName": row["photo_name"],
             "resumeName": row["resume_name"], "createdAt": row["created"],
+            "status": row["status"], "notes": row["notes"], "rating": row["rating"],
             "thumbnail": "data:image/jpeg;base64," + base64.b64encode(face_thumbnail(row["thumbnail"])).decode("ascii"),
         }
 
     def list(self, owner):
         with self.connection() as db:
             rows = db.execute("""SELECT id,candidate_name,interview_date,start_time,duration,
-                photo_name,resume_name,created,thumbnail FROM interviews WHERE owner=?
+                photo_name,resume_name,created,thumbnail,status,notes,rating FROM interviews WHERE owner=?
                 ORDER BY interview_date,start_time,created DESC""", (owner,)).fetchall()
             return {"interviews": [self.metadata(row) for row in rows], "limit": MAX_INTERVIEWS}
 
     def excel(self, owner):
         with self.connection() as db:
             rows = db.execute("""SELECT candidate_name,interview_date,start_time,duration,
-                photo_name,resume_name,created FROM interviews WHERE owner=?
+                photo_name,resume_name,created,status,notes,rating FROM interviews WHERE owner=?
                 ORDER BY interview_date,start_time,created DESC""", (owner,)).fetchall()
             return make_excel(rows)
 
@@ -198,11 +209,14 @@ class InterviewStore:
             if total + len(record["photo"]) + len(record["resume"]) + len(record["thumbnail"]) > 512 * 1024 * 1024:
                 raise HTTPException(409, "Interview storage is full. Contact Bluqq support.")
             interview_id = str(uuid.uuid4())
-            db.execute("INSERT INTO interviews VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
+            db.execute("""INSERT INTO interviews (
+                id,owner,candidate_name,interview_date,start_time,duration,photo_name,photo_mime,
+                photo,thumbnail,resume_name,resume_mime,resume,created,status,notes,rating
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
                 interview_id, owner, record["candidateName"], record["interviewDate"],
                 record["startTime"], record["duration"], record["photoName"], record["photoMime"],
                 record["photo"], record["thumbnail"], record["resumeName"], record["resumeMime"],
-                record["resume"], int(time.time()),
+                record["resume"], int(time.time()), record["status"], record["notes"], record["rating"],
             ))
             row = db.execute("SELECT * FROM interviews WHERE id=?", (interview_id,)).fetchone()
             return self.metadata(row)
@@ -222,6 +236,7 @@ class InterviewStore:
             values = {
                 "candidate_name": record["candidateName"], "interview_date": record["interviewDate"],
                 "start_time": record["startTime"], "duration": record["duration"],
+                "status": record["status"], "notes": record["notes"], "rating": record["rating"],
                 "photo_name": record.get("photoName", current["photo_name"]),
                 "photo_mime": record.get("photoMime", current["photo_mime"]),
                 "photo": record.get("photo", current["photo"]),
@@ -233,7 +248,8 @@ class InterviewStore:
             db.execute("""UPDATE interviews SET candidate_name=:candidate_name, interview_date=:interview_date,
                 start_time=:start_time, duration=:duration, photo_name=:photo_name, photo_mime=:photo_mime,
                 photo=:photo, thumbnail=:thumbnail, resume_name=:resume_name, resume_mime=:resume_mime,
-                resume=:resume WHERE owner=:owner AND id=:id""", {**values, "owner": owner, "id": interview_id})
+                resume=:resume, status=:status, notes=:notes, rating=:rating
+                WHERE owner=:owner AND id=:id""", {**values, "owner": owner, "id": interview_id})
             row = db.execute("SELECT * FROM interviews WHERE id=?", (interview_id,)).fetchone()
             return self.metadata(row)
 
@@ -292,6 +308,18 @@ def register_interview_routes(app, access_keys):
         if not re.fullmatch(r"[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}", interview_id):
             raise HTTPException(404, "Interview not found.")
 
+    def profile_fields(payload):
+        status = payload.get("status", "Scheduled")
+        notes = payload.get("notes", "")
+        rating = payload.get("rating", 0)
+        if status not in INTERVIEW_STATUSES:
+            raise HTTPException(400, "Choose a valid interview status.")
+        if not isinstance(notes, str) or len(notes) > 2000 or any(ord(char) < 32 and char not in "\n\r\t" for char in notes):
+            raise HTTPException(400, "Interview notes must be 2,000 characters or fewer.")
+        if type(rating) is not int or not 0 <= rating <= 5:
+            raise HTTPException(400, "Choose a rating from 1 to 5, or leave it unrated.")
+        return status, notes.strip(), rating
+
     @app.get("/api/interviews")
     async def list_interviews(request: Request):
         owner = authenticate(request)
@@ -321,6 +349,7 @@ def register_interview_routes(app, access_keys):
         interview_date = payload.get("interviewDate")
         start_time = payload.get("startTime")
         duration = payload.get("duration")
+        status, notes, rating = profile_fields(payload)
         if not isinstance(name, str) or not 1 <= len(name.strip()) <= 100 or any(ord(c) < 32 for c in name):
             raise HTTPException(400, "Enter a valid candidate name.")
         try:
@@ -348,6 +377,7 @@ def register_interview_routes(app, access_keys):
             "candidateName": name.strip(), "interviewDate": interview_date, "startTime": start_time,
             "duration": duration, "photoName": photo_name, "photoMime": photo_mime, "photo": photo,
             "thumbnail": thumbnail, "resumeName": resume_name, "resumeMime": resume_mime, "resume": resume,
+            "status": status, "notes": notes, "rating": rating,
         }
         if save_lock.locked():
             raise HTTPException(429, "Another interview is being saved. Try again shortly.")
@@ -374,6 +404,7 @@ def register_interview_routes(app, access_keys):
             raise HTTPException(400, "Interview details could not be read.") from None
         name, interview_date = payload.get("candidateName"), payload.get("interviewDate")
         start_time, duration = payload.get("startTime"), payload.get("duration")
+        status, notes, rating = profile_fields(payload)
         if not isinstance(name, str) or not 1 <= len(name.strip()) <= 100 or any(ord(c) < 32 for c in name):
             raise HTTPException(400, "Enter a valid candidate name.")
         try:
@@ -386,7 +417,8 @@ def register_interview_routes(app, access_keys):
             raise HTTPException(400, "Choose a valid start time.")
         if type(duration) is not int or not 1 <= duration <= 720:
             raise HTTPException(400, "Choose a valid interview duration.")
-        record = {"candidateName": name.strip(), "interviewDate": interview_date, "startTime": start_time, "duration": duration}
+        record = {"candidateName": name.strip(), "interviewDate": interview_date, "startTime": start_time,
+                  "duration": duration, "status": status, "notes": notes, "rating": rating}
         if payload.get("photoData") is not None:
             photo_name, photo_mime = payload.get("photoName"), payload.get("photoMime")
             if not isinstance(photo_name, str) or not 1 <= len(photo_name) <= 160 or photo_mime not in PHOTO_MIMES:

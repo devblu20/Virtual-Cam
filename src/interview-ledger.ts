@@ -1,6 +1,7 @@
 import "./interview-ledger.css";
 
-type Interview = { id: string; candidateName: string; interviewDate: string; startTime: string; duration: number; photoName: string; resumeName: string; createdAt: number; thumbnail: string };
+type InterviewStatus = "Scheduled" | "Completed" | "Selected" | "Rejected" | "Cancelled";
+type Interview = { id: string; candidateName: string; interviewDate: string; startTime: string; duration: number; photoName: string; resumeName: string; createdAt: number; thumbnail: string; status: InterviewStatus; notes: string; rating: number };
 const get = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const loginView = get<HTMLElement>("loginView");
 const ledgerView = get<HTMLElement>("ledgerView");
@@ -15,10 +16,14 @@ const timeInput = get<HTMLInputElement>("ledgerTime");
 const durationInput = get<HTMLSelectElement>("ledgerDuration");
 const customDurationLabel = get<HTMLLabelElement>("customDurationLabel");
 const customDurationInput = get<HTMLInputElement>("customDuration");
+const statusInput = get<HTMLSelectElement>("ledgerStatus");
+const ratingInput = get<HTMLSelectElement>("ledgerRating");
+const notesInput = get<HTMLTextAreaElement>("ledgerNotes");
 const photoInput = get<HTMLInputElement>("ledgerPhoto");
 const resumeInput = get<HTMLInputElement>("ledgerResume");
 const consentInput = get<HTMLInputElement>("ledgerConsent");
 const submitButton = get<HTMLButtonElement>("submitInterviewButton");
+const candidateDialog = get<HTMLDialogElement>("candidateDialog");
 let credentials = "";
 let interviews: Interview[] = [];
 let editing: Interview | null = null;
@@ -66,17 +71,21 @@ function safe(value: string) {
 
 function render() {
   const query = get<HTMLInputElement>("searchInput").value.trim().toLowerCase();
-  const shown = interviews.filter(item => item.candidateName.toLowerCase().includes(query));
+  const status = get<HTMLSelectElement>("statusFilter").value;
+  const filterDate = get<HTMLInputElement>("dateFilter").value;
+  const shown = interviews.filter(item => item.candidateName.toLowerCase().includes(query) && (!status || item.status === status) && (!filterDate || item.interviewDate === filterDate));
   rows.replaceChildren();
   shown.forEach((item, index) => {
     const row = document.createElement("tr");
-    row.innerHTML = `<td class="row-number">${index + 1}</td><td><div class="candidate-cell"><span class="face-photo" title="${safe(item.photoName)}"><img src="${item.thumbnail}" alt="${safe(item.candidateName)} candidate photo" /></span><strong class="candidate-name">${safe(item.candidateName)}</strong></div></td><td>${dateLabel(item.interviewDate)}</td><td>${timeLabel(item.startTime)}</td><td>${durationLabel(item.duration)}</td><td><div class="resume-cell"><span title="${safe(item.resumeName)}">${safe(item.resumeName)}</span><button class="download" type="button">↓ Download résumé</button></div></td><td><div class="row-actions"><button class="edit" type="button">Edit details</button><button class="delete" type="button">Delete</button></div></td>`;
+    row.innerHTML = `<td class="row-number">${index + 1}</td><td><button class="candidate-cell view" type="button"><span class="face-photo" title="${safe(item.photoName)}"><img src="${item.thumbnail}" alt="${safe(item.candidateName)} candidate photo" /></span><span><strong class="candidate-name">${safe(item.candidateName)}</strong><small>View profile</small></span></button></td><td><span class="status-badge status-${item.status.toLowerCase()}">${safe(item.status)}</span></td><td>${dateLabel(item.interviewDate)}</td><td>${timeLabel(item.startTime)}</td><td>${durationLabel(item.duration)}</td><td><div class="resume-cell"><span title="${safe(item.resumeName)}">${safe(item.resumeName)}</span><button class="download" type="button">↓ Download résumé</button></div></td><td><div class="row-actions"><button class="edit" type="button">Edit details</button><button class="delete" type="button">Delete</button></div></td>`;
+    row.querySelector<HTMLButtonElement>(".view")!.onclick = () => openCandidate(item);
     row.querySelector<HTMLButtonElement>(".download")!.onclick = () => downloadResume(item);
     row.querySelector<HTMLButtonElement>(".edit")!.onclick = () => openDialog(item);
     row.querySelector<HTMLButtonElement>(".delete")!.onclick = () => removeInterview(item);
     rows.append(row);
   });
   emptyState.hidden = interviews.length > 0;
+  if (interviews.length && !shown.length) sheetMessage.textContent = "No candidates match these filters.";
   get("totalCount").textContent = String(interviews.length);
   get("upcomingCount").textContent = String(interviews.filter(item => item.interviewDate >= today).length);
   get("totalMinutes").textContent = `${interviews.reduce((sum, item) => sum + item.duration, 0)} min`;
@@ -120,9 +129,29 @@ function openDialog(item: Interview | null = null) {
       customDurationInput.required = true;
     }
     consentInput.checked = true;
+    statusInput.value = item.status;
+    ratingInput.value = String(item.rating);
+    notesInput.value = item.notes;
   }
   dialog.showModal();
   nameInput.focus();
+}
+
+function openCandidate(item: Interview) {
+  get<HTMLImageElement>("candidatePhoto").src = item.thumbnail;
+  get<HTMLImageElement>("candidatePhoto").alt = `${item.candidateName} candidate photo`;
+  const status = get("candidateStatus");
+  status.textContent = item.status;
+  status.className = `status-badge status-${item.status.toLowerCase()}`;
+  get("candidateName").textContent = item.candidateName;
+  get("candidateSchedule").textContent = `${dateLabel(item.interviewDate)} · ${timeLabel(item.startTime)}`;
+  get("candidateDuration").textContent = durationLabel(item.duration);
+  get("candidateRating").textContent = item.rating ? `${"★".repeat(item.rating)} ${item.rating}/5` : "Not rated";
+  get("candidateResume").textContent = item.resumeName;
+  get("candidateNotes").textContent = item.notes || "No interview notes added yet.";
+  get<HTMLButtonElement>("candidateResumeButton").onclick = () => downloadResume(item);
+  get<HTMLButtonElement>("candidateEditButton").onclick = () => { candidateDialog.close(); openDialog(item); };
+  candidateDialog.showModal();
 }
 
 async function toBase64(file: File) {
@@ -160,7 +189,7 @@ async function save(event: SubmitEvent) {
   try {
     const payload: Record<string, unknown> = {
       candidateName: nameInput.value.trim(), interviewDate: dateInput.value, startTime: timeInput.value,
-      duration,
+      duration, status: statusInput.value, rating: Number(ratingInput.value), notes: notesInput.value.trim(),
     };
     if (photo) Object.assign(payload, { photoName: photo.name, photoMime: mime(photo, "photo"), photoData: await toBase64(photo) });
     if (resume) Object.assign(payload, { resumeName: resume.name, resumeMime: mime(resume, "resume"), resumeData: await toBase64(resume) });
@@ -214,9 +243,19 @@ get("newInterviewButton").onclick = () => openDialog();
 get("emptyAddButton").onclick = () => openDialog();
 get("closeDialogButton").onclick = () => dialog.close();
 get("cancelDialogButton").onclick = () => dialog.close();
+get("closeCandidateButton").onclick = () => candidateDialog.close();
 get("refreshButton").onclick = load;
 get("excelButton").onclick = downloadExcel;
 get<HTMLInputElement>("searchInput").oninput = render;
+get<HTMLSelectElement>("statusFilter").onchange = render;
+get<HTMLInputElement>("dateFilter").onchange = render;
+get("clearFiltersButton").onclick = () => {
+  get<HTMLInputElement>("searchInput").value = "";
+  get<HTMLSelectElement>("statusFilter").value = "";
+  get<HTMLInputElement>("dateFilter").value = "";
+  sheetMessage.textContent = interviews.length ? `${interviews.length} record${interviews.length === 1 ? "" : "s"} ready.` : "";
+  render();
+};
 durationInput.onchange = () => {
   const custom = durationInput.value === "custom";
   customDurationLabel.hidden = !custom;
