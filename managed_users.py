@@ -1,5 +1,4 @@
 """Persistent user credentials and plain-text prompt assignments (no remote code)."""
-import asyncio
 import json
 import hashlib
 import hmac
@@ -9,12 +8,10 @@ import secrets
 import time
 import uuid
 from collections import defaultdict, deque
-from urllib.parse import unquote
 
 from fastapi import HTTPException, Request
-from fastapi.responses import Response
 from starlette.concurrency import run_in_threadpool
-from reference_library import MAX_BYTES, MIMES, ReferenceStore
+from reference_library import ReferenceStore
 from processing_config import load_processing_config
 from usage_history import small_json
 
@@ -213,17 +210,6 @@ def register_managed_routes(app, store):
         if not 32 <= len(supplied) <= 256 or not hmac.compare_digest(hashlib.sha256(supplied.encode()).hexdigest(), admin_hash):
             raise HTTPException(403, 'Administrator access required.')
 
-    def user_id(owner):
-        if not re.fullmatch(r'[A-Za-z0-9_-]{1,64}', owner):
-            raise HTTPException(404, 'User not found.')
-        store.user(owner)
-        return owner
-
-    def photo_id(value):
-        if not re.fullmatch(r'[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}', value):
-            raise HTTPException(404, 'Photo not found.')
-        return value
-
     @app.get('/api/client-config')
     async def configuration(request: Request, version: int = 2):
         if version not in (2, 3):
@@ -273,52 +259,6 @@ def register_managed_routes(app, store):
         if not isinstance(body, dict):
             raise HTTPException(400, 'User details required.')
         return await run_in_threadpool(store.update, owner, body, True)
-
-    @app.get('/api/admin/users/{owner}/photos')
-    async def admin_photos(owner: str, request: Request):
-        await run_in_threadpool(admin, request)
-        owner = await run_in_threadpool(user_id, owner)
-        return await run_in_threadpool(store.list, owner)
-
-    @app.post('/api/admin/users/{owner}/photos', status_code=201)
-    async def admin_upload_photo(owner: str, request: Request):
-        await run_in_threadpool(admin, request)
-        owner = await run_in_threadpool(user_id, owner)
-        name = unquote(request.headers.get('X-Reference-Name', 'Reference photo')).strip()
-        if not 1 <= len(name) <= 80 or any(ord(character) < 32 for character in name):
-            raise HTTPException(400, 'Use a photo name between 1 and 80 characters.')
-        content_type = request.headers.get('Content-Type', '').split(';')[0].strip().lower()
-        if content_type not in MIMES.values():
-            raise HTTPException(415, 'Use PNG, JPEG or WebP.')
-        content_length = request.headers.get('Content-Length', '')
-        if content_length.isdigit() and int(content_length) > MAX_BYTES:
-            raise HTTPException(413, 'Photo must be at most 2 MB.')
-        try:
-            async with asyncio.timeout(30):
-                data = await request.body()
-        except TimeoutError:
-            raise HTTPException(408, 'Photo upload timed out.') from None
-        if not data:
-            raise HTTPException(400, 'Choose a non-empty image.')
-        if len(data) > MAX_BYTES:
-            raise HTTPException(413, 'Photo must be at most 2 MB.')
-        return await run_in_threadpool(store.add, owner, name, data, content_type)
-
-    @app.get('/api/admin/users/{owner}/photos/{photo}')
-    async def admin_photo(owner: str, photo: str, request: Request):
-        await run_in_threadpool(admin, request)
-        owner = await run_in_threadpool(user_id, owner)
-        photo = photo_id(photo)
-        data, mime = await run_in_threadpool(store.get, owner, photo)
-        return Response(data, media_type=mime)
-
-    @app.delete('/api/admin/users/{owner}/photos/{photo}', status_code=204)
-    async def admin_delete_photo(owner: str, photo: str, request: Request):
-        await run_in_threadpool(admin, request)
-        owner = await run_in_threadpool(user_id, owner)
-        photo = photo_id(photo)
-        await run_in_threadpool(store.delete, owner, photo)
-        return Response(status_code=204)
 
     @app.put('/api/admin/default-prompt')
     async def default(request: Request):
