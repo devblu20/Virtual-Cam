@@ -318,8 +318,9 @@ def create_app() -> FastAPI:
             "generationConfig": {"responseModalities": ["IMAGE"]},
         }
         if framing == "auto":
-            payload["generationConfig"]["responseFormat"] = {
-                "image": {"aspectRatio": aspect_ratio, "imageSize": "1K"}
+            payload["generationConfig"]["imageConfig"] = {
+                "aspectRatio": aspect_ratio,
+                "imageSize": "1K",
             }
         try:
             edited, media_type = await run_in_threadpool(request_gemini_image, gemini_key, payload)
@@ -332,6 +333,8 @@ def create_app() -> FastAPI:
                         bucket.remove(now)
                     except ValueError:
                         pass
+            if error.status == 400:
+                raise HTTPException(400, str(error)) from None
             if error.status in {401, 403}:
                 raise HTTPException(
                     503,
