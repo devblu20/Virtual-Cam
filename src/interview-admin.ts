@@ -1,72 +1,71 @@
 import "./interview-admin.css";
 
+type Interview = { id: string; candidateName: string; interviewDate: string; startTime: string; duration: number; status: string };
 const get = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-const unlockPanel = get<HTMLElement>("unlockPanel");
-const accessPanel = get<HTMLElement>("accessPanel");
-const unlockMessage = get<HTMLElement>("unlockMessage");
-const accessMessage = get<HTMLElement>("accessMessage");
-const adminKeyInput = get<HTMLInputElement>("adminKey");
-const emailOne = get<HTMLInputElement>("emailOne");
-const emailTwo = get<HTMLInputElement>("emailTwo");
-let adminKey = "";
+const loginView = get<HTMLElement>("loginView");
+const dashboard = get<HTMLElement>("dashboard");
+const logoutButton = get<HTMLButtonElement>("logoutButton");
+const message = get<HTMLElement>("loginMessage");
+let credentials = "";
 
-async function request(method = "GET", body?: { emails: string[] }) {
-  const response = await fetch("/api/admin/interview-access", {
-    method,
-    headers: {
-      Authorization: `Bearer ${adminKey}`,
-      ...(body ? { "Content-Type": "application/json" } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+function basic(email: string, password: string) {
+  const bytes = new TextEncoder().encode(`${email}:${password}`);
+  let binary = "";
+  bytes.forEach(byte => binary += String.fromCharCode(byte));
+  return `Basic ${btoa(binary)}`;
+}
+
+function escape(value: string) {
+  return value.replace(/[&<>'"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character] || character);
+}
+
+function formatDuration(minutes: number) {
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `${hours} hr ${rest} min` : `${hours} hr`;
+}
+
+async function load() {
+  const response = await fetch("/api/interview-admin", { headers: { Authorization: credentials } });
   const payload = await response.json().catch(() => ({ detail: "The server response could not be read." }));
-  if (!response.ok) throw new Error(payload.detail || "Access settings could not be loaded.");
-  return payload as { emails: string[]; limit: number };
+  if (!response.ok) throw new Error(payload.detail || "Admin Dashboard could not be loaded.");
+  const interviews = payload.interviews as Interview[];
+  const today = new Date().toISOString().slice(0, 10);
+  get("signedInAs").textContent = `Signed in as ${payload.administrator}`;
+  get("totalCount").textContent = String(interviews.length);
+  get("upcomingCount").textContent = String(interviews.filter(item => item.interviewDate >= today && item.status === "Scheduled").length);
+  get("completedCount").textContent = String(interviews.filter(item => item.status === "Completed").length);
+  get("totalTime").textContent = formatDuration(interviews.reduce((sum, item) => sum + item.duration, 0));
+  get("recordCount").textContent = `${interviews.length} record${interviews.length === 1 ? "" : "s"}`;
+  get("emptyState").hidden = interviews.length > 0;
+  get<HTMLTableSectionElement>("adminRows").innerHTML = interviews.map(item => `<tr><td><strong>${escape(item.candidateName)}</strong></td><td><span class="status status-${escape(item.status.toLowerCase())}">${escape(item.status)}</span></td><td>${escape(item.interviewDate)}</td><td>${escape(item.startTime)}</td><td>${formatDuration(item.duration)}</td></tr>`).join("");
+  get("dashboardMessage").textContent = `Last refreshed ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
 }
 
-function lock() {
-  adminKey = "";
-  adminKeyInput.value = "";
-  emailOne.value = "";
-  emailTwo.value = "";
-  accessMessage.textContent = "";
-  accessPanel.hidden = true;
-  unlockPanel.hidden = false;
-  adminKeyInput.focus();
-}
-
-get<HTMLFormElement>("unlockForm").addEventListener("submit", async event => {
+get<HTMLFormElement>("loginForm").addEventListener("submit", async event => {
   event.preventDefault();
-  adminKey = adminKeyInput.value;
-  unlockMessage.textContent = "Checking administrator access…";
+  credentials = basic(get<HTMLInputElement>("adminEmail").value.trim().toLowerCase(), get<HTMLInputElement>("adminPassword").value);
+  message.textContent = "Opening Admin Dashboard…";
   try {
-    const data = await request();
-    emailOne.value = data.emails[0] || "";
-    emailTwo.value = data.emails[1] || "";
-    unlockMessage.textContent = "";
-    adminKeyInput.value = "";
-    unlockPanel.hidden = true;
-    accessPanel.hidden = false;
-    emailOne.focus();
+    await load();
+    message.textContent = "";
+    get<HTMLInputElement>("adminPassword").value = "";
+    loginView.hidden = true;
+    dashboard.hidden = false;
+    logoutButton.hidden = false;
   } catch (error) {
-    adminKey = "";
-    unlockMessage.textContent = error instanceof Error ? error.message : "Administrator access failed.";
+    credentials = "";
+    message.textContent = error instanceof Error ? error.message : "Admin login failed.";
   }
 });
 
-get<HTMLFormElement>("accessForm").addEventListener("submit", async event => {
-  event.preventDefault();
-  accessMessage.classList.remove("success");
-  accessMessage.textContent = "Saving approved emails…";
-  try {
-    const data = await request("PUT", { emails: [emailOne.value, emailTwo.value] });
-    emailOne.value = data.emails[0];
-    emailTwo.value = data.emails[1];
-    accessMessage.classList.add("success");
-    accessMessage.textContent = "Access saved. Only these two emails can now sign in.";
-  } catch (error) {
-    accessMessage.textContent = error instanceof Error ? error.message : "Access settings could not be saved.";
-  }
+get("refreshButton").addEventListener("click", () => load().catch(error => { get("dashboardMessage").textContent = error instanceof Error ? error.message : "Refresh failed."; }));
+logoutButton.addEventListener("click", () => {
+  credentials = "";
+  dashboard.hidden = true;
+  logoutButton.hidden = true;
+  loginView.hidden = false;
+  get<HTMLInputElement>("adminEmail").value = "";
+  message.textContent = "";
 });
-
-get("lockButton").addEventListener("click", lock);

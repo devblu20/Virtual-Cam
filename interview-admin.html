@@ -4,41 +4,42 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light" />
-    <meta name="description" content="Manage access to the Bluqq Interview Ledger." />
-    <title>Interview Access Admin | Bluqq</title>
+    <meta name="description" content="Private Bluqq Interview Administration dashboard." />
+    <title>Interview Admin | Bluqq</title>
   </head>
   <body>
     <main class="admin-shell">
       <header class="topbar">
-        <div class="wordmark"><span>b.</span><div><b>Interview Ledger</b><small>ACCESS ADMIN</small></div></div>
-        <a class="back-link" href="/interview-ledger.html">← Back to ledger</a>
+        <div class="wordmark"><span>b.</span><div><b>Interview Admin</b><small>BY BLUQQ</small></div></div>
+        <div class="top-actions"><a class="back-link" href="/interview-ledger.html">← Interview Ledger</a><button class="quiet" id="logoutButton" type="button" hidden>Log out</button></div>
       </header>
-
-      <section class="hero">
-        <p class="kicker">INTERVIEW ADMINISTRATION</p>
-        <h1>Control who can enter.</h1>
-        <p>Keep Interview Ledger access limited to two approved email addresses.</p>
+      <section class="login-view" id="loginView">
+        <div class="login-copy"><p class="kicker">RESTRICTED ADMINISTRATION</p><h1>Interview oversight,<br />in one private view.</h1><p>This dashboard is available only to the two approved Bluqq administrators.</p></div>
+        <section class="panel login-panel">
+          <p class="kicker">ADMIN SIGN IN</p><h2>Open dashboard</h2>
+          <form id="loginForm">
+            <label>Email address<input id="adminEmail" type="email" autocomplete="username" placeholder="Enter approved email" required /></label>
+            <label>Interview Ledger password<input id="adminPassword" type="password" autocomplete="current-password" placeholder="Enter password" required /></label>
+            <button class="primary" type="submit">Open Admin Dashboard <span>→</span></button>
+            <p class="message" id="loginMessage" aria-live="polite"></p>
+          </form>
+          <p class="security-note">Only approved administrator emails can open this page.</p>
+        </section>
       </section>
-
-      <section class="panel unlock-panel" id="unlockPanel">
-        <div class="panel-heading"><span class="panel-number">01</span><div><h2>Administrator access</h2><p>Enter the administrator key to manage the approved emails.</p></div></div>
-        <form id="unlockForm">
-          <label>Administrator key<input id="adminKey" type="password" autocomplete="current-password" placeholder="Enter administrator key" required /></label>
-          <button class="primary" type="submit">Unlock access settings <span>→</span></button>
-          <p class="message" id="unlockMessage" aria-live="polite"></p>
-        </form>
-      </section>
-
-      <section class="panel access-panel" id="accessPanel" hidden>
-        <div class="panel-heading"><span class="panel-number">02</span><div><h2>Approved emails</h2><p>Exactly two people can sign in to the shared Interview Ledger.</p></div><button class="quiet" id="lockButton" type="button">Lock</button></div>
-        <div class="notice"><strong>Shared workspace</strong><span>Both emails use the current Interview Ledger password and see the same candidate records.</span></div>
-        <form id="accessForm">
-          <div class="email-grid">
-            <label>Approved email 1<input id="emailOne" type="email" autocomplete="off" placeholder="name@company.com" required /></label>
-            <label>Approved email 2<input id="emailTwo" type="email" autocomplete="off" placeholder="name@company.com" required /></label>
-          </div>
-          <div class="form-actions"><p class="message" id="accessMessage" aria-live="polite"></p><button class="primary" type="submit">Save access</button></div>
-        </form>
+      <section class="dashboard" id="dashboard" hidden>
+        <section class="hero"><div><p class="kicker">INTERVIEW ADMINISTRATION</p><h1>Dashboard overview</h1><p id="signedInAs"></p></div><button class="outline" id="refreshButton" type="button">↻ Refresh</button></section>
+        <section class="stats">
+          <article><small>Total interviews</small><strong id="totalCount">0</strong></article>
+          <article><small>Upcoming</small><strong id="upcomingCount">0</strong></article>
+          <article><small>Completed</small><strong id="completedCount">0</strong></article>
+          <article><small>Total time</small><strong id="totalTime">0 min</strong></article>
+        </section>
+        <section class="panel records-panel">
+          <div class="panel-heading"><div><h2>Candidate records</h2><p>Live records from the shared Interview Ledger.</p></div><span id="recordCount">0 records</span></div>
+          <div class="table-wrap"><table><thead><tr><th>Candidate</th><th>Status</th><th>Date</th><th>Start time</th><th>Duration</th></tr></thead><tbody id="adminRows"></tbody></table></div>
+          <div class="empty" id="emptyState" hidden>No interview records are available yet.</div>
+          <p class="dashboard-message" id="dashboardMessage" aria-live="polite"></p>
+        </section>
       </section>
     </main>
     <script type="module" src="/src/interview-admin.ts"></script>
