@@ -299,11 +299,21 @@ async function restoreOriginalHead(edited: Blob, originalCrop: Blob, outputName:
   const faceWidth = originalBox?.width || width * 0.24;
   const faceBottom = originalBox ? originalBox.y + originalBox.height : height * 0.42;
   const garmentTop = Math.max(0, faceBottom - faceWidth * 0.08);
-  const topHalfWidth = faceWidth * 1.2;
-  // Keep the edit around the original torso. A viewport-wide mask can expose
-  // the rectangular bounds of a Gemini response that changed the framing.
-  const bottomHalfWidth = Math.max(faceWidth * 2.1, width * 0.25);
   const maskFeather = Math.max(10, Math.round(Math.min(width, height) * 0.018));
+  const alignedLeft = Math.max(0, editedX);
+  const alignedRight = Math.min(width, editedX + editedBitmap.width * editedScaleX);
+  const safeHalfWidth = Math.max(faceWidth * 1.2, Math.min(
+    centreX - alignedLeft,
+    alignedRight - centreX,
+  ) - maskFeather * 2);
+  // Cover the full collar, shoulders and sleeves so the original dark shirt
+  // cannot show as a grey outline. Clamp the mask inside the aligned Gemini
+  // image bounds to avoid exposing a rectangular response edge.
+  const topHalfWidth = Math.min(faceWidth * 1.75, safeHalfWidth);
+  const bottomHalfWidth = Math.min(
+    Math.max(faceWidth * 2.7, width * 0.32),
+    safeHalfWidth,
+  );
   // Give the blurred mask room outside the final image. Blurring a mask that
   // ends at the canvas boundary makes its bottom edge partially transparent,
   // which reveals a horizontal strip of the original shirt underneath.
