@@ -270,11 +270,7 @@ async function restoreOriginalHead(edited: Blob, originalCrop: Blob, outputName:
   alignedEdit.width = width;
   alignedEdit.height = height;
   const alignedContext = alignedEdit.getContext("2d");
-  const garmentMask = document.createElement("canvas");
-  garmentMask.width = width;
-  garmentMask.height = height;
-  const garmentMaskContext = garmentMask.getContext("2d");
-  if (!alignedContext || !garmentMaskContext) {
+  if (!alignedContext) {
     editedBitmap.close(); originalBitmap.close();
     throw new Error("This browser could not preserve the original framing.");
   }
@@ -291,17 +287,35 @@ async function restoreOriginalHead(edited: Blob, originalCrop: Blob, outputName:
   const topHalfWidth = faceWidth * 1.18;
   const bottomHalfWidth = Math.max(faceWidth * 2.2, width * 0.44);
   const maskFeather = Math.max(10, Math.round(Math.min(width, height) * 0.018));
+  // Give the blurred mask room outside the final image. Blurring a mask that
+  // ends at the canvas boundary makes its bottom edge partially transparent,
+  // which reveals a horizontal strip of the original shirt underneath.
+  const maskPadding = maskFeather * 3;
+  const garmentMask = document.createElement("canvas");
+  garmentMask.width = width + maskPadding * 2;
+  garmentMask.height = height + maskPadding * 2;
+  const garmentMaskContext = garmentMask.getContext("2d");
+  if (!garmentMaskContext) {
+    editedBitmap.close(); originalBitmap.close();
+    throw new Error("This browser could not preserve the original framing.");
+  }
   garmentMaskContext.filter = `blur(${maskFeather}px)`;
   garmentMaskContext.fillStyle = "white";
   garmentMaskContext.beginPath();
-  garmentMaskContext.moveTo(centreX - topHalfWidth, garmentTop);
-  garmentMaskContext.lineTo(centreX + topHalfWidth, garmentTop);
-  garmentMaskContext.lineTo(Math.min(width, centreX + bottomHalfWidth), height + maskFeather);
-  garmentMaskContext.lineTo(Math.max(0, centreX - bottomHalfWidth), height + maskFeather);
+  garmentMaskContext.moveTo(centreX - topHalfWidth + maskPadding, garmentTop + maskPadding);
+  garmentMaskContext.lineTo(centreX + topHalfWidth + maskPadding, garmentTop + maskPadding);
+  garmentMaskContext.lineTo(
+    Math.min(width, centreX + bottomHalfWidth) + maskPadding,
+    height + maskPadding * 2,
+  );
+  garmentMaskContext.lineTo(
+    Math.max(0, centreX - bottomHalfWidth) + maskPadding,
+    height + maskPadding * 2,
+  );
   garmentMaskContext.closePath();
   garmentMaskContext.fill();
   alignedContext.globalCompositeOperation = "destination-in";
-  alignedContext.drawImage(garmentMask, 0, 0);
+  alignedContext.drawImage(garmentMask, -maskPadding, -maskPadding);
   alignedContext.globalCompositeOperation = "source-over";
   context.drawImage(alignedEdit, 0, 0);
 

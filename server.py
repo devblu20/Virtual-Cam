@@ -80,6 +80,8 @@ Use a tightly localized garment mask and edit shirt pixels only. Copy every pixe
 
 {frame}
 
+Keep the bottom edge continuous with the rest of the portrait. Do not repeat, mirror, tile or paste any horizontal strip of the shirt, body or background at any edge.
+
 Return one photorealistic edited image only."""
 
 
