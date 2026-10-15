@@ -15,7 +15,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
-COPY server.py reference_library.py interview_store.py usage_history.py managed_users.py processing_config.py transformation_prompt.txt ./
+COPY server.py website_login.py reference_library.py interview_store.py usage_history.py managed_users.py processing_config.py transformation_prompt.txt ./
 COPY --from=frontend /build/dist ./dist
 RUN useradd --system --uid 10001 --no-create-home appuser
 USER appuser

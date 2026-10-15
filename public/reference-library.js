@@ -40,7 +40,7 @@ libraryInput.addEventListener("change", () => { libraryElement("storageConsent")
 
 async function libraryRequest(key, path, options = {}) {
   if (key.length < 32 || key.length > 256) throw new Error("Enter the user's personal access key above first.");
-  const response = await fetch(path, { ...options, cache: "no-store", credentials: "omit",
+  const response = await fetch(path, { ...options, cache: "no-store", credentials: "same-origin",
     signal: AbortSignal.timeout(35000),
     headers: { ...options.headers, Authorization: `Bearer ${key}` } });
   if (!response.ok) {
@@ -76,8 +76,8 @@ async function showLibrary(key, generation) {
   libraryEmpty.hidden = data.references.length > 0;
   libraryCount.textContent = `${data.references.length} of ${data.limit} photos saved`;
   libraryMessage(data.references.length
-    ? "Your library is up to date. These photos are available in the extension using the same personal key."
-    : "No saved photos yet. Choose a reference above, then save it to your extension.", "success");
+    ? (key === "website-cookie-session-not-an-access-key" ? "Your account’s photo library is up to date." : "Your library is up to date. These photos are available in the extension using the same personal key.")
+    : "No saved photos yet. Choose a reference above, then save it to your library.", "success");
 }
 refreshLibrary.addEventListener("click", async () => {
   if (libraryBusy) return;

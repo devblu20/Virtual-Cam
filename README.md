@@ -1,5 +1,31 @@
 # Virtual CAM Cloud — Railway setup
 
+## Main website sign-in
+
+Set `VCAM_LOGIN_ID` and `VCAM_LOGIN_PASSWORD_HASH` in Railway to require a
+password login for the main studio. Generate the salted password hash with
+`python scripts/configure_website_login.py`; it creates the Git-ignored
+`.env.website-login` file. Copy its two values into Railway's service variables,
+keeping the hash value intact and omitting the surrounding dotenv quotes.
+Never commit this file or put the password in frontend JavaScript.
+
+The website uses an HttpOnly session cookie valid for eight hours. Signing out
+revokes the session; a service restart signs everyone out. Failed login attempts
+are limited. Run one worker/replica as specified below. Signed-in website users
+do not need a personal access key. Existing extension bearer keys still work,
+and administrator/Interview Ledger credentials remain independent.
+
+The website login has its own stable account ID, visible in user management.
+Its photo library is separate from existing extension users. Configure a writable
+Railway volume and `VCAM_DATA_DIR` as described in `PHOTO_LIBRARY_SETUP.md` for
+stored references and version 3 processing settings. Deploy the new source and
+set both login variables together; leaving both unset retains legacy key access.
+An incomplete login configuration fails closed.
+
+Railway's `RAILWAY_PUBLIC_DOMAIN` is used for HTTPS session cookies and request
+origin checks behind its proxy. For a custom domain, set `VCAM_WEBSITE_ORIGIN`
+to that domain's full HTTPS origin (for example `https://camera.example.com`).
+
 This is the cloud edition of your existing VirtualCAMshare project. It serves a
 camera-preview website and an authenticated Decart temporary-token API.
 No OBS, virtual-camera driver, or Python installation is needed on a visitor's

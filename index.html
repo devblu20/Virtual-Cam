@@ -19,6 +19,7 @@
           </div>
         </div>
         <nav class="page-nav" aria-label="Studio sections"><a href="#setupPanel">Camera setup</a><a href="#librarySection">Photo library</a><a class="admin-link" href="/admin.html" target="_blank" rel="noopener" title="Opens in a new tab. A separate administrator key is required.">Admin dashboard <span aria-hidden="true">↗</span></a></nav>
+        <!-- ACCOUNT_MENU -->
       </header>
 
       <section class="studio-heading" aria-labelledby="studioTitle">
@@ -52,7 +53,7 @@
 
       <section class="control-panel" id="setupPanel" aria-labelledby="setupHeading">
         <div class="section-heading field-wide"><span class="step-number" aria-hidden="true">01</span><div><h2 id="setupHeading">Set up your preview</h2><p>Connect your camera and choose a reference you have permission to use.</p></div><span class="section-tag">LIVE STUDIO</span></div>
-        <div class="field field-wide">
+        <div class="field field-wide" id="personalAccessField">
           <label for="accessKey">Personal access key</label>
           <input id="accessKey" type="password" autocomplete="off" spellcheck="false" placeholder="Personal access key supplied by Bluqq" />
           <p class="hint">Your key connects the preview and your private photo library. Use a personal key, never a provider API key. This page does not save it in browser storage.</p>

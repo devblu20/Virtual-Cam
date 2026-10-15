@@ -27,6 +27,7 @@ from starlette.concurrency import run_in_threadpool
 from processing_config import load_processing_config
 from managed_users import ManagedUsers, register_managed_routes
 from interview_store import register_interview_routes
+from website_login import WebsiteLogin
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
@@ -150,9 +151,14 @@ def load_access_keys() -> dict[str, str]:
 def create_app() -> FastAPI:
     app = FastAPI(title="Virtual CAM Cloud", docs_url=None, redoc_url=None, openapi_url=None)
     api_key = os.getenv("DECART_API_KEY", "").strip()
-    access_keys = ManagedUsers(load_access_keys())
+    website_login = WebsiteLogin()
+    keys = load_access_keys()
+    if website_login.configured:
+        keys[website_login.owner] = hashlib.sha256(website_login.key.encode()).hexdigest()
+    access_keys = ManagedUsers(keys)
     dist = BASE_DIR / "dist"
-    ready = bool(api_key and access_keys and (dist / "index.html").is_file())
+    ready = bool(api_key and access_keys and (dist / "index.html").is_file()
+                 and (not website_login.enabled or website_login.configured))
     minute_requests: dict[str, deque[float]] = defaultdict(deque)
     daily_requests: dict[str, deque[float]] = defaultdict(deque)
     global_requests: deque[float] = deque()
@@ -382,6 +388,7 @@ def create_app() -> FastAPI:
 
     register_reference_routes(app, access_keys)
     register_interview_routes(app, access_keys)
+    website_login.register(app, dist)
 
     if dist.is_dir():
         app.mount("/", StaticFiles(directory=dist, html=True), name="frontend")

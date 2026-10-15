@@ -558,7 +558,7 @@ async function loadDefaultPrompt() {
   try {
     const response = await fetch("/api/client-config?version=3", {
       headers: { Authorization: "Bearer " + requestedKey },
-      cache: "no-store", credentials: "omit", redirect: "error",
+      cache: "no-store", credentials: "same-origin", redirect: "error",
       signal: AbortSignal.timeout(15000),
     });
     const payload = await response.json().catch(() => ({}));
@@ -616,7 +616,7 @@ async function generateShirtEdit() {
       headers: { Authorization: "Bearer " + accessKey.value.trim(), "Content-Type": upload.type },
       body: upload,
       cache: "no-store",
-      credentials: "omit",
+      credentials: "same-origin",
       redirect: "error",
     });
     if (!response.ok) {
@@ -738,7 +738,7 @@ async function fetchToken(signal: AbortSignal, reporter: UsageReporter, referenc
     method: "POST",
     headers: { Authorization: "Bearer " + accessKey.value.trim(), "Content-Type": "application/json" },
     body: JSON.stringify({ processingConfigVersion: 3, usage: { source: "website", platform: "website", version: "website-server-settings-v3", avatar } }),
-    cache: "no-store", credentials: "omit", redirect: "error",
+    cache: "no-store", credentials: "same-origin", redirect: "error",
     signal,
   });
   const payload = await response.json().catch(() => ({}));
@@ -917,6 +917,18 @@ fullscreenButton.addEventListener("click", () => void el<HTMLElement>("outputCar
 window.addEventListener("pagehide", () => { stop("closed"); ++referenceVersion; checkingReference = false; preparedReference = null; releaseReferencePreview(); showOriginalReference(null); });
 window.addEventListener("pageshow", () => { if (referenceInput.files?.[0] && !preparedReference) void prepareReference(); });
 window.addEventListener("beforeunload", () => stop("closed"));
+document.querySelector<HTMLFormElement>("#websiteLogout")?.addEventListener("submit", async event => {
+  event.preventDefault();
+  stop("closed");
+  try {
+    const response = await fetch("/api/website-logout", {
+      method: "POST", credentials: "same-origin", cache: "no-store", redirect: "error",
+      headers: { Accept: "application/json" }, signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok) throw new Error("Sign-out failed. Please try again.");
+    window.location.replace("/login.html");
+  } catch (error) { showError(error); }
+});
 syncControls();
 if (!navigator.mediaDevices?.getUserMedia) {
   cameraButton.disabled = true;
