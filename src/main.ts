@@ -229,15 +229,20 @@ async function restoreOriginalHead(edited: Blob, originalCrop: Blob, outputName:
   let centreY = height * 0.3;
   let radiusX = width * 0.2;
   let radiusY = height * 0.235;
-  const originalFace = await detectLargestFace(originalBitmap);
+  const [originalFace, editedFace] = await Promise.all([
+    detectLargestFace(originalBitmap),
+    detectLargestFace(editedBitmap),
+  ]);
   const originalBox = originalFace?.boundingBox;
   // Gemini can append a thin pale/duplicated band to the bottom of an edited
   // image. Exclude that unsafe edge and map the remaining pixels back to the
   // same destination height so the portrait framing stays unchanged.
   const editedBottomTrim = Math.max(2, Math.round(editedBitmap.height * 0.02));
   const editedSourceHeight = Math.max(1, editedBitmap.height - editedBottomTrim);
-  const editedScaleX = width / editedBitmap.width;
-  const editedScaleY = height / editedSourceHeight;
+  let editedScaleX = width / editedBitmap.width;
+  let editedScaleY = height / editedSourceHeight;
+  let editedX = 0;
+  let editedY = 0;
   if (originalBox) {
     centreX = originalBox.x + originalBox.width / 2;
     centreY = originalBox.y + originalBox.height * 0.4;
@@ -245,6 +250,21 @@ async function restoreOriginalHead(edited: Blob, originalCrop: Blob, outputName:
     // Preserve hair and facial identity without restoring the original shirt
     // collar beneath the jaw over Gemini's newly coloured garment.
     radiusY = originalBox.height * 0.68;
+  }
+  if (originalBox && editedFace) {
+    const editedBox = editedFace.boundingBox;
+    const originalFaceX = originalBox.x + originalBox.width / 2;
+    const originalFaceY = originalBox.y + originalBox.height / 2;
+    const editedFaceX = editedBox.x + editedBox.width / 2;
+    const editedFaceY = editedBox.y + editedBox.height / 2;
+    // Match the person's width to the original. Vertically map the detected
+    // face centre and the bottom of the edited portrait to the original frame,
+    // which preserves the original body position without leaving empty bounds.
+    editedScaleX = originalBox.width / Math.max(1, editedBox.width);
+    editedScaleY = (height - originalFaceY) /
+      Math.max(1, editedSourceHeight - editedFaceY);
+    editedX = originalFaceX - editedFaceX * editedScaleX;
+    editedY = originalFaceY - editedFaceY * editedScaleY;
   }
 
   const canvas = document.createElement("canvas");
@@ -271,16 +291,18 @@ async function restoreOriginalHead(edited: Blob, originalCrop: Blob, outputName:
     0,
     editedBitmap.width,
     editedSourceHeight,
-    0,
-    0,
+    editedX,
+    editedY,
     editedBitmap.width * editedScaleX,
     editedSourceHeight * editedScaleY,
   );
   const faceWidth = originalBox?.width || width * 0.24;
   const faceBottom = originalBox ? originalBox.y + originalBox.height : height * 0.42;
   const garmentTop = Math.max(0, faceBottom - faceWidth * 0.08);
-  const topHalfWidth = faceWidth * 1.18;
-  const bottomHalfWidth = Math.max(faceWidth * 2.2, width * 0.44);
+  const topHalfWidth = faceWidth * 1.2;
+  // Keep the edit around the original torso. A viewport-wide mask can expose
+  // the rectangular bounds of a Gemini response that changed the framing.
+  const bottomHalfWidth = Math.max(faceWidth * 2.1, width * 0.25);
   const maskFeather = Math.max(10, Math.round(Math.min(width, height) * 0.018));
   // Give the blurred mask room outside the final image. Blurring a mask that
   // ends at the canvas boundary makes its bottom edge partially transparent,
