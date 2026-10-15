@@ -2,6 +2,7 @@ import "./interview-ledger.css";
 
 type InterviewStatus = "Scheduled" | "Completed" | "Selected" | "Rejected" | "Cancelled";
 type Interview = { id: string; candidateName: string; interviewDate: string; startTime: string; duration: number; photoName: string; resumeName: string; createdAt: number; thumbnail: string; status: InterviewStatus; notes: string; rating: number };
+type ManagedUser = { id: string; name: string };
 const get = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const loginView = get<HTMLElement>("loginView");
 const ledgerView = get<HTMLElement>("ledgerView");
@@ -24,8 +25,10 @@ const resumeInput = get<HTMLInputElement>("ledgerResume");
 const consentInput = get<HTMLInputElement>("ledgerConsent");
 const submitButton = get<HTMLButtonElement>("submitInterviewButton");
 const candidateDialog = get<HTMLDialogElement>("candidateDialog");
+const adminDashboard = document.body.hasAttribute("data-admin-dashboard");
 let credentials = "";
 let interviews: Interview[] = [];
+let managedUsers: ManagedUser[] = [];
 let editing: Interview | null = null;
 const presetDurations = new Set([15, 30, 45, 60, 90, 120, 150, 180, 240]);
 
@@ -77,11 +80,16 @@ function render() {
   rows.replaceChildren();
   shown.forEach((item, index) => {
     const row = document.createElement("tr");
-    row.innerHTML = `<td class="row-number">${index + 1}</td><td><button class="candidate-cell view" type="button"><span class="face-photo" title="${safe(item.photoName)}"><img src="${item.thumbnail}" alt="${safe(item.candidateName)} candidate photo" /></span><span><strong class="candidate-name">${safe(item.candidateName)}</strong><small>View profile</small></span></button></td><td><span class="status-badge status-${item.status.toLowerCase()}">${safe(item.status)}</span></td><td>${dateLabel(item.interviewDate)}</td><td>${timeLabel(item.startTime)}</td><td>${durationLabel(item.duration)}</td><td><div class="resume-cell"><span title="${safe(item.resumeName)}">${safe(item.resumeName)}</span><button class="download" type="button">↓ Download résumé</button></div></td><td><div class="row-actions"><button class="edit" type="button">Edit details</button><button class="delete" type="button">Delete</button></div></td>`;
+    const assignment = adminDashboard
+      ? `<td><select class="user-assignment" aria-label="Send ${safe(item.candidateName)} photo to user"><option value="">Choose user…</option>${managedUsers.map(user => `<option value="${safe(user.id)}">${safe(user.name)}</option>`).join("")}</select></td>`
+      : "";
+    row.innerHTML = `<td class="row-number">${index + 1}</td><td><button class="candidate-cell view" type="button"><span class="face-photo" title="${safe(item.photoName)}"><img src="${item.thumbnail}" alt="${safe(item.candidateName)} candidate photo" /></span><span><strong class="candidate-name">${safe(item.candidateName)}</strong><small>View profile</small></span></button></td><td><span class="status-badge status-${item.status.toLowerCase()}">${safe(item.status)}</span></td><td>${dateLabel(item.interviewDate)}</td><td>${timeLabel(item.startTime)}</td><td>${durationLabel(item.duration)}</td><td><div class="resume-cell"><span title="${safe(item.resumeName)}">${safe(item.resumeName)}</span><button class="download" type="button">↓ Download résumé</button></div></td>${assignment}<td><div class="row-actions"><button class="edit" type="button">Edit details</button><button class="delete" type="button">Delete</button></div></td>`;
     row.querySelector<HTMLButtonElement>(".view")!.onclick = () => openCandidate(item);
     row.querySelector<HTMLButtonElement>(".download")!.onclick = () => downloadResume(item);
     row.querySelector<HTMLButtonElement>(".edit")!.onclick = () => openDialog(item);
     row.querySelector<HTMLButtonElement>(".delete")!.onclick = () => removeInterview(item);
+    const userAssignment = row.querySelector<HTMLSelectElement>(".user-assignment");
+    if (userAssignment) userAssignment.onchange = () => sendPhotoToUser(item, userAssignment);
     rows.append(row);
   });
   emptyState.hidden = interviews.length > 0;
@@ -94,12 +102,38 @@ function render() {
 async function load() {
   sheetMessage.textContent = "Refreshing interview data…";
   try {
-    const response = await request("/api/interviews");
-    interviews = ((await response.json()) as { interviews: Interview[] }).interviews;
+    const interviewResponse = await request("/api/interviews");
+    interviews = ((await interviewResponse.json()) as { interviews: Interview[] }).interviews;
+    if (adminDashboard) {
+      const userResponse = await request("/api/interview-admin/users");
+      managedUsers = ((await userResponse.json()) as { users: ManagedUser[] }).users;
+    }
     sheetMessage.textContent = interviews.length ? `${interviews.length} record${interviews.length === 1 ? "" : "s"} ready.` : "";
     render();
   } catch (error) {
     sheetMessage.textContent = error instanceof Error ? error.message : "Could not load interviews.";
+    throw error;
+  }
+}
+
+async function sendPhotoToUser(item: Interview, select: HTMLSelectElement) {
+  const owner = select.value;
+  if (!owner) return;
+  const userName = select.selectedOptions[0]?.textContent || "selected user";
+  select.disabled = true;
+  sheetMessage.textContent = `Sending ${item.candidateName}'s photo to ${userName}…`;
+  try {
+    await request(`/api/interview-admin/interviews/${encodeURIComponent(item.id)}/photo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ owner }),
+    });
+    sheetMessage.textContent = `${item.candidateName}'s photo saved to ${userName}'s Photo Library.`;
+  } catch (error) {
+    sheetMessage.textContent = error instanceof Error ? error.message : "Photo could not be saved to this user.";
+  } finally {
+    select.value = "";
+    select.disabled = false;
   }
 }
 
@@ -244,7 +278,7 @@ get("emptyAddButton").onclick = () => openDialog();
 get("closeDialogButton").onclick = () => dialog.close();
 get("cancelDialogButton").onclick = () => dialog.close();
 get("closeCandidateButton").onclick = () => candidateDialog.close();
-get("refreshButton").onclick = load;
+get("refreshButton").onclick = () => { void load().catch(() => undefined); };
 get("excelButton").onclick = downloadExcel;
 get<HTMLInputElement>("searchInput").oninput = render;
 get<HTMLSelectElement>("statusFilter").onchange = render;

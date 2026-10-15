@@ -19,10 +19,10 @@ from xml.sax.saxutils import escape
 
 from fastapi import HTTPException, Request
 from fastapi.responses import Response
-from PIL import Image
+from PIL import Image, ImageOps
 from starlette.concurrency import run_in_threadpool
 
-from reference_library import validate_image
+from reference_library import MAX_BYTES as MAX_REFERENCE_BYTES, validate_image
 
 MAX_PHOTO_BYTES = 10 * 1024 * 1024
 MAX_RESUME_BYTES = 10 * 1024 * 1024
@@ -232,6 +232,13 @@ class InterviewStore:
                 raise HTTPException(404, "Interview not found.")
             return bytes(row["resume"]), row["resume_mime"], row["resume_name"]
 
+    def photo(self, owner, interview_id):
+        with self.connection() as db:
+            row = db.execute("SELECT photo,photo_mime,candidate_name FROM interviews WHERE owner=? AND id=?", (owner, interview_id)).fetchone()
+            if row is None:
+                raise HTTPException(404, "Interview not found.")
+            return bytes(row["photo"]), row["photo_mime"], row["candidate_name"]
+
     def update(self, owner, interview_id, record):
         with self.connection() as db:
             current = db.execute("SELECT * FROM interviews WHERE owner=? AND id=?", (owner, interview_id)).fetchone()
@@ -344,11 +351,59 @@ def register_interview_routes(app, access_keys):
             raise HTTPException(400, "Choose a rating from 1 to 5, or leave it unrated.")
         return status, notes.strip(), rating
 
+    def reference_ready_photo(data, content_type):
+        if len(data) <= MAX_REFERENCE_BYTES:
+            return data, content_type
+        try:
+            with Image.open(io.BytesIO(data)) as source:
+                image = ImageOps.exif_transpose(source).convert("RGB")
+                for max_side, quality in ((2600, 88), (2200, 82), (1800, 76), (1500, 70), (1280, 66)):
+                    prepared = image.copy()
+                    prepared.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
+                    output = io.BytesIO()
+                    prepared.save(output, format="JPEG", quality=quality, optimize=True)
+                    if output.tell() <= MAX_REFERENCE_BYTES:
+                        return output.getvalue(), "image/jpeg"
+        except (OSError, ValueError):
+            raise HTTPException(400, "Candidate photo could not be prepared for the user's library.") from None
+        raise HTTPException(413, "Candidate photo is too large for the user's library.")
+
     @app.get("/api/interview-admin")
     async def interview_admin_overview(request: Request):
         administrator, owner = authenticate_interview_admin(request)
         data = await run_in_threadpool(store.list, owner)
         return {**data, "administrator": administrator}
+
+    @app.get("/api/interview-admin/users")
+    async def interview_admin_users(request: Request):
+        authenticate_interview_admin(request)
+        listing = await run_in_threadpool(access_keys.listing)
+        users = [
+            {"id": user["id"], "name": user["name"]}
+            for user in listing["users"] if user.get("active")
+        ]
+        return {"users": users}
+
+    @app.post("/api/interview-admin/interviews/{interview_id}/photo", status_code=201)
+    async def assign_interview_photo(interview_id: str, request: Request):
+        _, interview_owner = authenticate_interview_admin(request)
+        check_id(interview_id)
+        if request.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
+            raise HTTPException(415, "Send the selected user as JSON.")
+        try:
+            payload = await request.json()
+        except (ValueError, UnicodeDecodeError):
+            raise HTTPException(400, "Selected user could not be read.") from None
+        target_owner = payload.get("owner") if isinstance(payload, dict) else None
+        if not isinstance(target_owner, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", target_owner):
+            raise HTTPException(400, "Choose a valid user.")
+        target_user = await run_in_threadpool(access_keys.user, target_owner)
+        if not target_user.get("active"):
+            raise HTTPException(409, "This user's access is disabled.")
+        photo, content_type, candidate_name = await run_in_threadpool(store.photo, interview_owner, interview_id)
+        photo, content_type = await run_in_threadpool(reference_ready_photo, photo, content_type)
+        saved = await run_in_threadpool(access_keys.add, target_owner, candidate_name, photo, content_type)
+        return {"photo": saved, "user": {"id": target_owner, "name": target_user["name"]}}
 
     @app.get("/api/interviews")
     async def list_interviews(request: Request):

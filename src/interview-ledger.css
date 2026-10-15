@@ -107,6 +107,10 @@ th:last-child, td:last-child { border-right: 0; }
 .candidate-cell.view > span:last-child { display: grid; gap: 4px; min-width: 0; }
 .candidate-cell.view small { color: #7f8d87; font-size: 8px; font-weight: 650; }
 .actions-column { width: 150px; }
+.assign-column { width: 190px; }
+.user-assignment { width: 100%; min-width: 160px; padding: 8px 9px; border: 1px solid #bcd5cb; border-radius: 6px; background: #fff; color: #2d3c37; font-size: 10px; }
+.user-assignment:disabled { cursor: wait; opacity: .65; }
+body[data-admin-dashboard] table { min-width: 1400px; }
 .face-photo { display: inline-grid; width: 58px; height: 58px; place-items: center; overflow: hidden; border: 3px solid #fff; border-radius: 12px; background: #edf1ef; box-shadow: 0 0 0 1px #d3dcd7, 0 5px 14px rgba(31,53,47,.12); }
 .face-photo img { width: 100%; height: 100%; object-fit: cover; }
 .resume-cell { display: grid; gap: 7px; }
