@@ -234,8 +234,13 @@ async function restoreOriginalHead(edited: Blob, originalCrop: Blob, outputName:
     detectLargestFace(editedBitmap),
   ]);
   const originalBox = originalFace?.boundingBox;
+  // Gemini can append a thin pale/duplicated band to the bottom of an edited
+  // image. Exclude that unsafe edge and map the remaining pixels back to the
+  // same destination height so the portrait framing stays unchanged.
+  const editedBottomTrim = Math.max(2, Math.round(editedBitmap.height * 0.02));
+  const editedSourceHeight = Math.max(1, editedBitmap.height - editedBottomTrim);
   let editedScaleX = width / editedBitmap.width;
-  let editedScaleY = height / editedBitmap.height;
+  let editedScaleY = height / editedSourceHeight;
   let editedX = 0;
   let editedY = 0;
   if (originalBox) {
@@ -249,11 +254,11 @@ async function restoreOriginalHead(edited: Blob, originalCrop: Blob, outputName:
     const uniformScale = ((originalBox.width / editedBox.width) +
       (originalBox.height / editedBox.height)) / 2;
     editedScaleX = uniformScale;
-    editedScaleY = uniformScale;
+    editedScaleY = uniformScale * (editedBitmap.height / editedSourceHeight);
     editedX = (originalBox.x + originalBox.width / 2) -
       (editedBox.x + editedBox.width / 2) * uniformScale;
     editedY = (originalBox.y + originalBox.height / 2) -
-      (editedBox.y + editedBox.height / 2) * uniformScale;
+      (editedBox.y + editedBox.height / 2) * editedScaleY;
   }
 
   const canvas = document.createElement("canvas");
@@ -276,10 +281,14 @@ async function restoreOriginalHead(edited: Blob, originalCrop: Blob, outputName:
   }
   alignedContext.drawImage(
     editedBitmap,
+    0,
+    0,
+    editedBitmap.width,
+    editedSourceHeight,
     editedX,
     editedY,
     editedBitmap.width * editedScaleX,
-    editedBitmap.height * editedScaleY,
+    editedSourceHeight * editedScaleY,
   );
   const faceWidth = originalBox?.width || width * 0.24;
   const faceBottom = originalBox ? originalBox.y + originalBox.height : height * 0.42;
