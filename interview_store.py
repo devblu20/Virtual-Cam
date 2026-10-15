@@ -29,7 +29,10 @@ MAX_RESUME_BYTES = 10 * 1024 * 1024
 MAX_REQUEST_BYTES = 28 * 1024 * 1024
 MAX_INTERVIEWS = 50
 INTERVIEW_STATUSES = {"Scheduled", "Completed", "Selected", "Rejected", "Cancelled"}
-INTERVIEW_ADMIN_EMAILS = {"devblu.work@gmail.com", "harshitakothari2703@gmail.com"}
+INTERVIEW_ADMIN_CREDENTIALS = {
+    "harshita2703@gmail.com": "9dfc71adb194b04a70e6eded333e6f44a47e1cc3dfd3be6174beccd119f4d34a",
+    "devblu.work@gmail.com": "bd03f224ac6c5069831826865e773836d2a5023bec835663cc31eb72e6997f25",
+}
 PHOTO_MIMES = {"image/jpeg", "image/png", "image/webp"}
 RESUME_MIMES = {
     "application/pdf": "pdf",
@@ -273,11 +276,11 @@ def register_interview_routes(app, access_keys):
             raise HTTPException(401, "Enter an approved administrator email and password.") from None
         email = email.strip().lower()
         expected_id = os.getenv("INTERVIEW_PORTAL_ID", "").strip()
-        expected_hash = os.getenv("INTERVIEW_PORTAL_PASSWORD_SHA256", "").strip().lower()
-        if not expected_id or not re.fullmatch(r"[a-f0-9]{64}", expected_hash):
+        if not expected_id:
             raise HTTPException(503, "Interview Admin login is not configured yet.")
         candidate_hash = hashlib.sha256(password.encode()).hexdigest()
-        if email not in INTERVIEW_ADMIN_EMAILS or not hmac.compare_digest(candidate_hash, expected_hash):
+        expected_hash = INTERVIEW_ADMIN_CREDENTIALS.get(email, "")
+        if not expected_hash or not hmac.compare_digest(candidate_hash, expected_hash):
             raise HTTPException(401, "Email or password is incorrect.")
         owner = "portal-" + hashlib.sha256(expected_id.encode()).hexdigest()[:24]
         return email, owner
