@@ -81,7 +81,7 @@ function render() {
   shown.forEach((item, index) => {
     const row = document.createElement("tr");
     const assignment = adminDashboard
-      ? `<td><select class="user-assignment" aria-label="Send ${safe(item.candidateName)} photo to user"><option value="">Choose user…</option>${managedUsers.map(user => `<option value="${safe(user.id)}">${safe(user.name)}</option>`).join("")}</select></td>`
+      ? `<td><div class="assignment-control"><select class="user-assignment" aria-label="Send ${safe(item.candidateName)} photo to user"><option value="">Choose user…</option>${managedUsers.map(user => `<option value="${safe(user.id)}">${safe(user.name)}</option>`).join("")}</select><span class="assignment-status" aria-live="polite"></span></div></td>`
       : "";
     row.innerHTML = `<td class="row-number">${index + 1}</td><td><button class="candidate-cell view" type="button"><span class="face-photo" title="${safe(item.photoName)}"><img src="${item.thumbnail}" alt="${safe(item.candidateName)} candidate photo" /></span><span><strong class="candidate-name">${safe(item.candidateName)}</strong><small>View profile</small></span></button></td><td><span class="status-badge status-${item.status.toLowerCase()}">${safe(item.status)}</span></td><td>${dateLabel(item.interviewDate)}</td><td>${timeLabel(item.startTime)}</td><td>${durationLabel(item.duration)}</td><td><div class="resume-cell"><span title="${safe(item.resumeName)}">${safe(item.resumeName)}</span><button class="download" type="button">↓ Download résumé</button></div></td>${assignment}<td><div class="row-actions"><button class="edit" type="button">Edit details</button><button class="delete" type="button">Delete</button></div></td>`;
     row.querySelector<HTMLButtonElement>(".view")!.onclick = () => openCandidate(item);
@@ -120,7 +120,9 @@ async function sendPhotoToUser(item: Interview, select: HTMLSelectElement) {
   const owner = select.value;
   if (!owner) return;
   const userName = select.selectedOptions[0]?.textContent || "selected user";
+  const status = select.parentElement?.querySelector<HTMLElement>(".assignment-status");
   select.disabled = true;
+  if (status) { status.className = "assignment-status pending"; status.textContent = `Sharing with ${userName}…`; }
   sheetMessage.textContent = `Sending ${item.candidateName}'s photo to ${userName}…`;
   try {
     await request(`/api/interview-admin/interviews/${encodeURIComponent(item.id)}/photo`, {
@@ -128,11 +130,14 @@ async function sendPhotoToUser(item: Interview, select: HTMLSelectElement) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ owner }),
     });
+    if (status) { status.className = "assignment-status success"; status.textContent = `✓ Shared with ${userName}`; }
     sheetMessage.textContent = `${item.candidateName}'s photo saved to ${userName}'s Photo Library.`;
   } catch (error) {
-    sheetMessage.textContent = error instanceof Error ? error.message : "Photo could not be saved to this user.";
-  } finally {
+    const message = error instanceof Error ? error.message : "Photo could not be saved to this user.";
     select.value = "";
+    if (status) { status.className = "assignment-status error"; status.textContent = message; }
+    sheetMessage.textContent = message;
+  } finally {
     select.disabled = false;
   }
 }
