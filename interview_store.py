@@ -30,7 +30,7 @@ MAX_REQUEST_BYTES = 28 * 1024 * 1024
 MAX_INTERVIEWS = 50
 INTERVIEW_STATUSES = {"Scheduled", "Completed", "Selected", "Rejected", "Cancelled"}
 INTERVIEW_ADMIN_CREDENTIALS = {
-    "harshita2703@gmail.com": "9dfc71adb194b04a70e6eded333e6f44a47e1cc3dfd3be6174beccd119f4d34a",
+    "harshitakothari2703@gmail.com": "9dfc71adb194b04a70e6eded333e6f44a47e1cc3dfd3be6174beccd119f4d34a",
     "devblu.work@gmail.com": "bd03f224ac6c5069831826865e773836d2a5023bec835663cc31eb72e6997f25",
 }
 PHOTO_MIMES = {"image/jpeg", "image/png", "image/webp"}
