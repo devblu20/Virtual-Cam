@@ -39,7 +39,8 @@ class OpenRouterError(Exception):
         self.status = status
 
 
-def shirt_edit_prompt(color: str, mode: str, wrinkles: str, framing: str, aspect_ratio: str) -> str:
+def shirt_edit_prompt(color: str, mode: str, wrinkles: str, framing: str, aspect_ratio: str,
+                      input_prepared: bool = True) -> str:
     wrinkle_instruction = {
         "natural": "Preserve or create subtle natural fabric wrinkles and soft folds that match the pose.",
         "visible": "Add clearly visible but natural fabric wrinkles, creases and folds around the chest, waist, underarms, elbows, sleeves and button placket, with physically consistent shadows and highlights.",
@@ -62,6 +63,10 @@ def shirt_edit_prompt(color: str, mode: str, wrinkles: str, framing: str, aspect
         "and only the upper four shirt buttons visible. Preserve this "
         "exact canvas, crop, scale, composition and aspect ratio. Do not zoom, crop, extend, rotate, reframe, "
         "reposition or resize the person or background. Return an image with the same width and height as the input."
+        if framing == "auto" and input_prepared else
+        f"Crop and reframe the portrait to an upper-torso {aspect_ratio} composition. Keep a balanced visible margin "
+        "above the full hair, keep both outer shirt and sleeve edges fully visible with clear background margin on both sides, "
+        "and show approximately the upper four shirt buttons. Keep the person centred and do not crop the hair, shoulders or shirt edges. "
         if framing == "auto" else
         "Preserve the supplied image's exact framing, crop, composition and aspect ratio."
     )
@@ -253,23 +258,10 @@ def create_app() -> FastAPI:
             logger.warning("Decart token request failed")
             raise HTTPException(502, "AI processing connection failed. Ask Bluqq support to check service access and credits.") from None
 
-    @app.post("/api/edit-reference")
-    async def edit_reference(request: Request):
+    async def generate_reference_edit(request: Request, user: str, input_prepared: bool = True):
         openrouter_key = os.getenv("OPENROUTER_API_KEY", "").strip()
         if not openrouter_key:
             raise HTTPException(503, "Reference image editing is not configured yet.")
-
-        authorization = request.headers.get("Authorization", "")
-        supplied = authorization[7:] if authorization.startswith("Bearer ") else ""
-        if not 32 <= len(supplied) <= 256:
-            raise HTTPException(401, "Enter a valid personal access key.")
-        candidate = hashlib.sha256(supplied.encode("utf-8")).hexdigest()
-        user = None
-        for user_id, digest in access_keys.items():
-            if hmac.compare_digest(candidate, digest):
-                user = user_id
-        if user is None:
-            raise HTTPException(401, "Access key is invalid or revoked.")
 
         content_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
         if content_type not in {"image/jpeg", "image/png", "image/webp"}:
@@ -313,7 +305,7 @@ def create_app() -> FastAPI:
         source = f"data:{content_type};base64,{base64.b64encode(image).decode('ascii')}"
         payload = {
             "model": "google/gemini-3.1-flash-lite-image",
-            "prompt": shirt_edit_prompt(color, mode, wrinkles, framing, aspect_ratio),
+            "prompt": shirt_edit_prompt(color, mode, wrinkles, framing, aspect_ratio, input_prepared),
             "input_references": [{"type": "image_url", "image_url": {"url": source}}],
             "resolution": "1K",
             "output_format": "jpeg",
@@ -333,6 +325,35 @@ def create_app() -> FastAPI:
                 raise HTTPException(504, str(error)) from None
             logger.warning("OpenRouter image edit failed with status %s", error.status)
             raise HTTPException(502, "Reference image editing failed. Try again.") from None
+
+    @app.post("/api/edit-reference")
+    async def edit_reference(request: Request):
+        authorization = request.headers.get("Authorization", "")
+        supplied = authorization[7:] if authorization.startswith("Bearer ") else ""
+        if not 32 <= len(supplied) <= 256:
+            raise HTTPException(401, "Enter a valid personal access key.")
+        candidate = hashlib.sha256(supplied.encode("utf-8")).hexdigest()
+        user = None
+        for user_id, digest in access_keys.items():
+            if hmac.compare_digest(candidate, digest):
+                user = user_id
+        if user is None:
+            raise HTTPException(401, "Access key is invalid or revoked.")
+        return await generate_reference_edit(request, user)
+
+    @app.post("/api/admin/users/{owner}/edit-reference")
+    async def admin_edit_reference(owner: str, request: Request):
+        admin_hash = os.getenv("VCAM_ADMIN_KEY_SHA256", "").strip().lower()
+        authorization = request.headers.get("Authorization", "")
+        supplied = authorization[7:] if authorization.startswith("Bearer ") else ""
+        candidate = hashlib.sha256(supplied.encode("utf-8")).hexdigest() if supplied else ""
+        if (not 32 <= len(supplied) <= 256 or not re.fullmatch(r"[a-f0-9]{64}", admin_hash)
+                or admin_hash in access_keys.values() or not hmac.compare_digest(candidate, admin_hash)):
+            raise HTTPException(403, "Administrator access required.")
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", owner):
+            raise HTTPException(404, "User not found.")
+        await run_in_threadpool(access_keys.user, owner)
+        return await generate_reference_edit(request, f"admin:{owner}", False)
 
     register_reference_routes(app, access_keys)
     register_interview_routes(app, access_keys)
