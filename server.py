@@ -317,6 +317,11 @@ def create_app() -> FastAPI:
             edited, media_type = await run_in_threadpool(request_openrouter_image, openrouter_key, payload)
             return Response(edited, media_type=media_type, headers={"Content-Disposition": "inline"})
         except OpenRouterError as error:
+            if error.status == 401:
+                raise HTTPException(
+                    503,
+                    "OpenRouter API key is invalid or revoked. Update OPENROUTER_API_KEY in Railway.",
+                ) from None
             if error.status == 402:
                 raise HTTPException(402, "OpenRouter credits are insufficient.") from None
             if error.status == 429:
