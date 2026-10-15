@@ -325,6 +325,13 @@ def create_app() -> FastAPI:
             edited, media_type = await run_in_threadpool(request_gemini_image, gemini_key, payload)
             return Response(edited, media_type=media_type, headers={"Content-Disposition": "inline"})
         except GeminiError as error:
+            # Provider failures must not consume the user's successful-edit quota.
+            async with edit_quota_lock:
+                for bucket, _, _ in limits:
+                    try:
+                        bucket.remove(now)
+                    except ValueError:
+                        pass
             if error.status in {401, 403}:
                 raise HTTPException(
                     503,
