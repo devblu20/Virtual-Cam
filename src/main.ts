@@ -323,6 +323,35 @@ async function restoreOriginalHead(edited: Blob, originalCrop: Blob, outputName:
   );
   garmentMaskContext.closePath();
   garmentMaskContext.fill();
+  // Keep the final rows fully inside the edited garment. A blurred alpha mask
+  // fades at every canvas boundary and can otherwise reveal the original pale
+  // shirt as a thin horizontal seam along the bottom of the result.
+  const solidBottomTop = Math.max(garmentTop, height - maskFeather * 4);
+  const wideningProgress = Math.min(1, Math.max(0,
+    (solidBottomTop - garmentTop) / Math.max(1, height - garmentTop),
+  ));
+  const solidTopHalfWidth = topHalfWidth +
+    (bottomHalfWidth - topHalfWidth) * wideningProgress;
+  garmentMaskContext.filter = "none";
+  garmentMaskContext.beginPath();
+  garmentMaskContext.moveTo(
+    Math.max(0, centreX - solidTopHalfWidth) + maskPadding,
+    solidBottomTop + maskPadding,
+  );
+  garmentMaskContext.lineTo(
+    Math.min(width, centreX + solidTopHalfWidth) + maskPadding,
+    solidBottomTop + maskPadding,
+  );
+  garmentMaskContext.lineTo(
+    Math.min(width, centreX + bottomHalfWidth) + maskPadding,
+    height + maskPadding * 2,
+  );
+  garmentMaskContext.lineTo(
+    Math.max(0, centreX - bottomHalfWidth) + maskPadding,
+    height + maskPadding * 2,
+  );
+  garmentMaskContext.closePath();
+  garmentMaskContext.fill();
   alignedContext.globalCompositeOperation = "destination-in";
   alignedContext.drawImage(garmentMask, -maskPadding, -maskPadding);
   alignedContext.globalCompositeOperation = "source-over";
