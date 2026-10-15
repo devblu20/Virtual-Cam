@@ -74,7 +74,7 @@ def shirt_edit_prompt(color: str, mode: str, wrinkles: str, framing: str, aspect
 
 {garment}
 
-Keep the shirt plain without copied patterns, embroidery, logos or text. The wrinkles must be visible at normal viewing size while remaining realistic and naturally worn. Do not make the shirt smooth, ironed, plastic-looking, excessively crumpled or damaged.
+Apply {color} consistently to every visible piece of shirt fabric, including the outer and inner collar, collar points, placket, pocket, cuffs and sleeves. Leave no grey, black, beige, peach, cream or original-colour shirt fabric behind. If the requested colour is simply pink, use a clear professional medium pink rather than a muted blush, beige or peach shade. Keep the shirt plain without copied patterns, embroidery, logos or text. The wrinkles must be visible at normal viewing size while remaining realistic and naturally worn. Do not make the shirt smooth, ironed, plastic-looking, excessively crumpled or damaged.
 
 Use a tightly localized garment mask and edit shirt pixels only. Copy every pixel outside the shirt unchanged from the input. In particular, keep the face, eyes, nose, lips, teeth, ears, skin, beard, hair, hairline, head shape, expression and neck pixel-for-pixel identical. Do not reconstruct, regenerate, beautify, retouch, sharpen or relight the face or hair. Keep identity, gender, body shape, pose, proportions, background, camera angle, focus, lighting and image quality unchanged.
 

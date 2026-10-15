@@ -240,9 +240,11 @@ async function restoreOriginalHead(edited: Blob, originalCrop: Blob, outputName:
   const editedScaleY = height / editedSourceHeight;
   if (originalBox) {
     centreX = originalBox.x + originalBox.width / 2;
-    centreY = originalBox.y + originalBox.height * 0.38;
-    radiusX = originalBox.width * 0.76;
-    radiusY = originalBox.height * 0.94;
+    centreY = originalBox.y + originalBox.height * 0.4;
+    radiusX = originalBox.width * 0.72;
+    // Preserve hair and facial identity without restoring the original shirt
+    // collar beneath the jaw over Gemini's newly coloured garment.
+    radiusY = originalBox.height * 0.68;
   }
 
   const canvas = document.createElement("canvas");
