@@ -33,7 +33,7 @@ load_dotenv(BASE_DIR / ".env")
 logger = logging.getLogger("virtualcam")
 
 
-class OpenRouterError(Exception):
+class GeminiError(Exception):
     def __init__(self, status: int, message: str):
         super().__init__(message)
         self.status = status
@@ -83,15 +83,14 @@ Use a tightly localized garment mask and edit shirt pixels only. Copy every pixe
 Return one photorealistic edited image only."""
 
 
-def request_openrouter_image(api_key: str, payload: dict) -> tuple[bytes, str]:
+def request_gemini_image(api_key: str, payload: dict) -> tuple[bytes, str]:
     request = urllib.request.Request(
-        "https://openrouter.ai/api/v1/images",
+        "https://generativelanguage.googleapis.com/v1/models/"
+        "gemini-3.1-flash-lite-image:generateContent",
         data=json.dumps(payload, separators=(",", ":")).encode("utf-8"),
         headers={
-            "Authorization": f"Bearer {api_key}",
+            "x-goog-api-key": api_key,
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://virtual-cam-production-9734.up.railway.app/",
-            "X-OpenRouter-Title": "Bluqq Virtual CAM",
         },
         method="POST",
     )
@@ -105,20 +104,26 @@ def request_openrouter_image(api_key: str, payload: dict) -> tuple[bytes, str]:
         except (ValueError, AttributeError):
             detail = ""
         safe = detail if isinstance(detail, str) and len(detail) <= 500 else ""
-        raise OpenRouterError(error.code, safe or "Image-editing provider rejected the request.") from None
+        raise GeminiError(error.code, safe or "Gemini rejected the image-editing request.") from None
     except (urllib.error.URLError, TimeoutError):
-        raise OpenRouterError(504, "Image editing timed out. Try again.") from None
+        raise GeminiError(504, "Gemini image editing timed out. Try again.") from None
 
     try:
         result = json.loads(body)
-        output = result["data"][0]
-        encoded = output["b64_json"]
-        media_type = output.get("media_type") or "image/jpeg"
+        parts = result["candidates"][0]["content"]["parts"]
+        images = [
+            part.get("inlineData") or part.get("inline_data")
+            for part in parts
+            if not part.get("thought") and (part.get("inlineData") or part.get("inline_data"))
+        ]
+        output = images[-1]
+        encoded = output["data"]
+        media_type = output.get("mimeType") or output.get("mime_type") or "image/png"
         image = base64.b64decode(encoded, validate=True)
     except (ValueError, TypeError, KeyError, IndexError):
-        raise OpenRouterError(502, "Image-editing provider returned an invalid image.") from None
+        raise GeminiError(502, "Gemini returned an invalid image.") from None
     if not image or len(image) > 20 * 1024 * 1024 or media_type not in {"image/jpeg", "image/png", "image/webp"}:
-        raise OpenRouterError(502, "Image-editing provider returned an unsupported image.")
+        raise GeminiError(502, "Gemini returned an unsupported image.")
     return image, media_type
 
 
@@ -259,9 +264,9 @@ def create_app() -> FastAPI:
             raise HTTPException(502, "AI processing connection failed. Ask Bluqq support to check service access and credits.") from None
 
     async def generate_reference_edit(request: Request, user: str, input_prepared: bool = True):
-        openrouter_key = os.getenv("OPENROUTER_API_KEY", "").strip()
-        if not openrouter_key:
-            raise HTTPException(503, "Reference image editing is not configured yet.")
+        gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+        if not gemini_key:
+            raise HTTPException(503, "Gemini image editing is not configured yet.")
 
         content_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
         if content_type not in {"image/jpeg", "image/png", "image/webp"}:
@@ -302,34 +307,37 @@ def create_app() -> FastAPI:
             for bucket, _, _ in limits:
                 bucket.append(now)
 
-        source = f"data:{content_type};base64,{base64.b64encode(image).decode('ascii')}"
         payload = {
-            "model": "google/gemini-3.1-flash-lite-image",
-            "prompt": shirt_edit_prompt(color, mode, wrinkles, framing, aspect_ratio, input_prepared),
-            "input_references": [{"type": "image_url", "image_url": {"url": source}}],
-            "resolution": "1K",
-            "output_format": "jpeg",
-            "n": 1,
+            "contents": [{"parts": [
+                {"text": shirt_edit_prompt(color, mode, wrinkles, framing, aspect_ratio, input_prepared)},
+                {"inline_data": {
+                    "mime_type": content_type,
+                    "data": base64.b64encode(image).decode("ascii"),
+                }},
+            ]}],
+            "generationConfig": {"responseModalities": ["IMAGE"]},
         }
         if framing == "auto":
-            payload["aspect_ratio"] = aspect_ratio
+            payload["generationConfig"]["responseFormat"] = {
+                "image": {"aspectRatio": aspect_ratio, "imageSize": "1K"}
+            }
         try:
-            edited, media_type = await run_in_threadpool(request_openrouter_image, openrouter_key, payload)
+            edited, media_type = await run_in_threadpool(request_gemini_image, gemini_key, payload)
             return Response(edited, media_type=media_type, headers={"Content-Disposition": "inline"})
-        except OpenRouterError as error:
-            if error.status == 401:
+        except GeminiError as error:
+            if error.status in {401, 403}:
                 raise HTTPException(
                     503,
-                    "OpenRouter API key is invalid or revoked. Update OPENROUTER_API_KEY in Railway.",
+                    "Gemini API key is invalid or blocked. Update GEMINI_API_KEY in Railway.",
                 ) from None
             if error.status == 402:
-                raise HTTPException(402, "OpenRouter credits are insufficient.") from None
+                raise HTTPException(402, "Gemini billing or quota is unavailable for image generation.") from None
             if error.status == 429:
-                raise HTTPException(429, "Image-editing provider rate limit reached. Try again shortly.") from None
+                raise HTTPException(429, "Gemini image generation quota was reached. Try again shortly.") from None
             if error.status == 504:
                 raise HTTPException(504, str(error)) from None
-            logger.warning("OpenRouter image edit failed with status %s", error.status)
-            raise HTTPException(502, "Reference image editing failed. Try again.") from None
+            logger.warning("Gemini image edit failed with status %s", error.status)
+            raise HTTPException(502, "Gemini image editing failed. Try again.") from None
 
     @app.post("/api/edit-reference")
     async def edit_reference(request: Request):
