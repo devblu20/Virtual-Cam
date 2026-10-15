@@ -290,7 +290,7 @@ def register_interview_routes(app, access_keys):
         if authorization.startswith("Basic "):
             try:
                 decoded = base64.b64decode(authorization[6:], validate=True).decode("utf-8")
-                portal_id, password = decoded.split(":", 1)
+                login_name, password = decoded.split(":", 1)
             except (ValueError, UnicodeDecodeError):
                 raise HTTPException(401, "Enter a valid Interview Ledger ID and password.") from None
             expected_id = os.getenv("INTERVIEW_PORTAL_ID", "").strip()
@@ -298,9 +298,12 @@ def register_interview_routes(app, access_keys):
             if not expected_id or not re.fullmatch(r"[a-f0-9]{64}", expected_hash):
                 raise HTTPException(503, "Interview Ledger login is not configured yet.")
             candidate_hash = hashlib.sha256(password.encode()).hexdigest()
-            if not (hmac.compare_digest(portal_id, expected_id) and hmac.compare_digest(candidate_hash, expected_hash)):
-                raise HTTPException(401, "Interview Ledger ID or password is incorrect.")
-            owner = "portal-" + hashlib.sha256(portal_id.encode()).hexdigest()[:24]
+            admin_hash = INTERVIEW_ADMIN_CREDENTIALS.get(login_name.strip().lower(), "")
+            portal_login = hmac.compare_digest(login_name, expected_id) and hmac.compare_digest(candidate_hash, expected_hash)
+            admin_login = bool(admin_hash) and hmac.compare_digest(candidate_hash, admin_hash)
+            if not (portal_login or admin_login):
+                raise HTTPException(401, "Email, workspace ID or password is incorrect.")
+            owner = "portal-" + hashlib.sha256(expected_id.encode()).hexdigest()[:24]
             bucket = requests[owner]
             now = time.monotonic()
             while bucket and now - bucket[0] >= 60:

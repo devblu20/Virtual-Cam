@@ -8,40 +8,111 @@
     <title>Interview Admin | Bluqq</title>
   </head>
   <body>
-    <main class="admin-shell">
-      <header class="topbar">
-        <div class="wordmark"><span>b.</span><div><b>Interview Admin</b><small>BY BLUQQ</small></div></div>
-        <div class="top-actions"><a class="back-link" href="/interview-ledger.html">← Interview Ledger</a><button class="quiet" id="logoutButton" type="button" hidden>Log out</button></div>
-      </header>
+    <main class="ledger-shell">
       <section class="login-view" id="loginView">
-        <div class="login-copy"><p class="kicker">RESTRICTED ADMINISTRATION</p><h1>Interview oversight,<br />in one private view.</h1><p>This dashboard is available only to the two approved Bluqq administrators.</p></div>
-        <section class="panel login-panel">
-          <p class="kicker">ADMIN SIGN IN</p><h2>Open dashboard</h2>
+        <div class="login-showcase">
+          <div class="login-brand"><span>b.</span><div><b>Bluqq</b><small>INTERVIEW ADMIN</small></div></div>
+          <div class="showcase-copy">
+            <p class="kicker">RESTRICTED INTERVIEW ADMINISTRATION</p>
+            <h2>Every candidate.<br />One admin view.</h2>
+            <p>Keep interview details, candidate photos and résumés organised in a private workspace built for fast hiring days.</p>
+          </div>
+          <div class="schedule-preview" aria-hidden="true">
+            <div class="preview-head"><div><span class="sheet-icon mini">▦</span><b>Interview data</b></div><small>EXCEL-STYLE REGISTER</small></div>
+            <div class="mini-sheet">
+              <div class="mini-sheet-row mini-sheet-head"><span>#</span><span>Candidate</span><span>Date</span><span>Start</span><span>Duration</span><span>Résumé</span></div>
+              <div class="mini-sheet-row"><span>1</span><span><i class="mini-avatar blue">C1</i><b>Candidate 01</b></span><span>14 Oct</span><span>10:30 AM</span><span>30 min</span><span><em>↓ PDF</em></span></div>
+              <div class="mini-sheet-row"><span>2</span><span><i class="mini-avatar purple">C2</i><b>Candidate 02</b></span><span>14 Oct</span><span>12:15 PM</span><span>45 min</span><span><em>↓ PDF</em></span></div>
+              <div class="mini-sheet-row"><span>3</span><span><i class="mini-avatar green">C3</i><b>Candidate 03</b></span><span>15 Oct</span><span>03:00 PM</span><span>30 min</span><span><em>↓ PDF</em></span></div>
+              <div class="mini-sheet-row"><span>4</span><span><i class="mini-avatar coral">C4</i><b>Candidate 04</b></span><span>16 Oct</span><span>11:00 AM</span><span>1 hr</span><span><em>↓ PDF</em></span></div>
+              <div class="mini-sheet-row"><span>5</span><span><i class="mini-avatar navy">C5</i><b>Candidate 05</b></span><span>16 Oct</span><span>02:30 PM</span><span>45 min</span><span><em>↓ PDF</em></span></div>
+            </div>
+            <div class="sheet-tabs"><span class="active">▦ Interviews</span><span>＋ Add record</span><strong>Download .xlsx ↗</strong></div>
+          </div>
+          <div class="showcase-points"><span>✓ Excel-ready records</span><span>✓ Private file storage</span><span>✓ Fast schedule updates</span></div>
+        </div>
+        <div class="login-card">
+          <p class="kicker">PRIVATE WORKSPACE</p>
+          <h1>Your interviews,<br />beautifully organised.</h1>
+          <p class="login-copy">Sign in with an approved administrator account to manage the complete candidate schedule.</p>
           <form id="loginForm">
-            <label>Email address<input id="adminEmail" type="email" autocomplete="username" placeholder="Enter approved email" required /></label>
-            <label>Password<input id="adminPassword" type="password" autocomplete="current-password" placeholder="Enter password" required /></label>
-            <button class="primary" type="submit">Open Admin Dashboard <span>→</span></button>
+            <label>Email address<input id="portalId" type="email" autocomplete="username" placeholder="Enter approved email" required /></label>
+            <label>Password<input id="portalPassword" type="password" autocomplete="current-password" placeholder="Enter password" required /></label>
+            <button class="primary wide" type="submit">Open Admin Dashboard <span>→</span></button>
             <p class="message" id="loginMessage" aria-live="polite"></p>
           </form>
-          <p class="security-note">Only approved administrator emails can open this page.</p>
-        </section>
+          <p class="security-note">Only the two approved administrator emails can open this dashboard.</p>
+        </div>
       </section>
-      <section class="dashboard" id="dashboard" hidden>
-        <section class="hero"><div><p class="kicker">INTERVIEW ADMINISTRATION</p><h1>Dashboard overview</h1><p id="signedInAs"></p></div><button class="outline" id="refreshButton" type="button">↻ Refresh</button></section>
-        <section class="stats">
+
+      <section class="ledger-view" id="ledgerView" hidden>
+        <header class="topbar">
+          <div class="wordmark"><span>b.</span><div><b>Interview Admin</b><small>BY BLUQQ</small></div></div>
+          <div class="top-actions"><a class="quiet admin-link" href="/interview-ledger.html">← Interview Ledger</a><button class="quiet" id="logoutButton" type="button">Log out</button><button class="primary" id="newInterviewButton" type="button">＋ New interview</button></div>
+        </header>
+        <section class="hero-row">
+          <div><p class="kicker">INTERVIEW OPERATIONS</p><h1>Candidate schedule</h1><p>One workspace for every upcoming conversation.</p></div>
+          <div class="hero-actions"><button class="outline" id="refreshButton" type="button">↻ Refresh</button><button class="excel-button" id="excelButton" type="button">▦ Download Excel</button></div>
+        </section>
+        <section class="stat-row">
           <article><small>Total interviews</small><strong id="totalCount">0</strong></article>
           <article><small>Upcoming</small><strong id="upcomingCount">0</strong></article>
-          <article><small>Completed</small><strong id="completedCount">0</strong></article>
-          <article><small>Total time</small><strong id="totalTime">0 min</strong></article>
+          <article><small>Total interview time</small><strong id="totalMinutes">0 min</strong></article>
         </section>
-        <section class="panel records-panel">
-          <div class="panel-heading"><div><h2>Candidate records</h2><p>Live records from the shared Interview Ledger.</p></div><span id="recordCount">0 records</span></div>
-          <div class="table-wrap"><table><thead><tr><th>Candidate</th><th>Status</th><th>Date</th><th>Start time</th><th>Duration</th></tr></thead><tbody id="adminRows"></tbody></table></div>
-          <div class="empty" id="emptyState" hidden>No interview records are available yet.</div>
-          <p class="dashboard-message" id="dashboardMessage" aria-live="polite"></p>
+        <section class="sheet-card">
+          <div class="sheet-toolbar">
+            <div><span class="sheet-icon">▦</span><div><b>Interview data</b><small>Live Excel-style register</small></div></div>
+            <div class="ledger-filters">
+              <label class="search-box">⌕<input id="searchInput" type="search" placeholder="Search candidates" /></label>
+              <label class="compact-filter"><span>Status</span><select id="statusFilter"><option value="">All statuses</option><option>Scheduled</option><option>Completed</option><option>Selected</option><option>Rejected</option><option>Cancelled</option></select></label>
+              <label class="compact-filter"><span>Date</span><input id="dateFilter" type="date" /></label>
+              <button class="clear-filters" id="clearFiltersButton" type="button">Clear</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th class="row-number">#</th><th class="candidate-column">Candidate</th><th>Status</th><th>Interview date</th><th>Start time</th><th>Duration</th><th>Résumé</th><th class="actions-column">Actions</th></tr></thead>
+              <tbody id="ledgerRows"></tbody>
+            </table>
+          </div>
+          <div class="empty-state" id="emptyState"><span>＋</span><h2>No interviews yet</h2><p>Add the first candidate to begin your interview ledger.</p><button class="primary" id="emptyAddButton" type="button">Add interview</button></div>
+          <p class="sheet-message" id="sheetMessage" aria-live="polite"></p>
         </section>
+        <footer>Private Interview Ledger · A product by <strong>Bluqq</strong></footer>
       </section>
     </main>
-    <script type="module" src="/src/interview-admin.ts"></script>
+
+    <dialog id="interviewDialog">
+      <form class="dialog-card" id="ledgerForm" method="dialog">
+        <div class="dialog-heading"><div><p class="kicker" id="dialogKicker">NEW RECORD</p><h2 id="dialogTitle">Add an interview</h2><p id="dialogDescription">Candidate details will appear as a new row in your ledger.</p></div><button class="close-button" id="closeDialogButton" type="button" aria-label="Close">×</button></div>
+        <div class="form-grid">
+          <label class="full">Candidate name<input id="ledgerName" type="text" maxlength="100" placeholder="Full name" required /></label>
+          <label>Interview date<input id="ledgerDate" type="date" required /></label>
+          <label>Start time<input id="ledgerTime" type="time" required /></label>
+          <label>Duration<select id="ledgerDuration" required><option value="">Choose duration</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60">1 hour</option><option value="90">1 hour 30 minutes</option><option value="120">2 hours</option><option value="150">2 hours 30 minutes</option><option value="180">3 hours</option><option value="240">4 hours</option><option value="custom">Other</option></select></label>
+          <label id="customDurationLabel" hidden>Custom duration (minutes)<input id="customDuration" type="number" min="1" max="720" step="1" inputmode="numeric" placeholder="Example: 75" /></label>
+          <label>Status<select id="ledgerStatus" required><option>Scheduled</option><option>Completed</option><option>Selected</option><option>Rejected</option><option>Cancelled</option></select></label>
+          <label>Rating<select id="ledgerRating"><option value="0">Not rated</option><option value="1">1 — Needs improvement</option><option value="2">2 — Fair</option><option value="3">3 — Good</option><option value="4">4 — Very good</option><option value="5">5 — Excellent</option></select></label>
+          <label class="full">Interview notes<textarea id="ledgerNotes" maxlength="2000" rows="4" placeholder="Add concise interview feedback or next steps"></textarea></label>
+          <label class="file-field">Candidate photo<input id="ledgerPhoto" type="file" accept="image/jpeg,image/png,image/webp" required /><small id="photoHelp">JPG, PNG or WebP · max 10 MB</small></label>
+          <label class="file-field">Résumé<input id="ledgerResume" type="file" accept=".pdf,.doc,.docx" required /><small id="resumeHelp">PDF, DOC or DOCX · max 10 MB</small></label>
+        </div>
+        <label class="consent"><input id="ledgerConsent" type="checkbox" required /><span>I have permission to store this candidate’s information and files.</span></label>
+        <p class="message" id="dialogMessage" aria-live="polite"></p>
+        <div class="dialog-actions"><button class="quiet" id="cancelDialogButton" type="button">Cancel</button><button class="primary" id="submitInterviewButton" type="submit">Save to ledger</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="candidateDialog" class="candidate-dialog">
+      <article class="candidate-panel">
+        <button class="close-button candidate-close" id="closeCandidateButton" type="button" aria-label="Close">×</button>
+        <div class="candidate-identity"><img id="candidatePhoto" alt="Candidate photo" /><div><span class="status-badge" id="candidateStatus"></span><h2 id="candidateName"></h2><p id="candidateSchedule"></p></div></div>
+        <div class="candidate-facts"><div><small>Duration</small><strong id="candidateDuration"></strong></div><div><small>Rating</small><strong id="candidateRating"></strong></div><div><small>Résumé</small><strong id="candidateResume"></strong></div></div>
+        <section class="candidate-notes"><small>INTERVIEW NOTES</small><p id="candidateNotes"></p></section>
+        <div class="candidate-panel-actions"><button class="quiet" id="candidateResumeButton" type="button">↓ Download résumé</button><button class="primary" id="candidateEditButton" type="button">Edit details</button></div>
+      </article>
+    </dialog>
+    <script type="module" src="/src/interview-ledger.ts"></script>
   </body>
 </html>
+
