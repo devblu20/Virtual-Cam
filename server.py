@@ -88,7 +88,7 @@ Return one photorealistic edited image only."""
 def request_gemini_image(api_key: str, payload: dict) -> tuple[bytes, str]:
     request = urllib.request.Request(
         "https://generativelanguage.googleapis.com/v1/models/"
-        "gemini-3.1-flash-lite-image:generateContent",
+        "gemini-3-pro-image:generateContent",
         data=json.dumps(payload, separators=(",", ":")).encode("utf-8"),
         headers={
             "x-goog-api-key": api_key,

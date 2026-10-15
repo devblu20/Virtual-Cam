@@ -220,45 +220,29 @@ async function restoreOriginalHead(edited: Blob, originalCrop: Blob, outputName:
     createImageBitmap(edited),
     createImageBitmap(originalCrop),
   ]);
-  // The prepared original owns the final canvas. Gemini sometimes returns a
-  // zoomed portrait even when asked to preserve framing, so align its face to
-  // the original and composite only the garment area back into this canvas.
+  // The prepared original owns the final canvas. Map Gemini's result to the
+  // complete frame and composite only the garment area. Face-based scaling can
+  // shrink a reframed response into a visible rectangular patch.
   const width = originalBitmap.width;
   const height = originalBitmap.height;
   let centreX = width * 0.5;
   let centreY = height * 0.3;
   let radiusX = width * 0.2;
   let radiusY = height * 0.235;
-  const [originalFace, editedFace] = await Promise.all([
-    detectLargestFace(originalBitmap),
-    detectLargestFace(editedBitmap),
-  ]);
+  const originalFace = await detectLargestFace(originalBitmap);
   const originalBox = originalFace?.boundingBox;
   // Gemini can append a thin pale/duplicated band to the bottom of an edited
   // image. Exclude that unsafe edge and map the remaining pixels back to the
   // same destination height so the portrait framing stays unchanged.
   const editedBottomTrim = Math.max(2, Math.round(editedBitmap.height * 0.02));
   const editedSourceHeight = Math.max(1, editedBitmap.height - editedBottomTrim);
-  let editedScaleX = width / editedBitmap.width;
-  let editedScaleY = height / editedSourceHeight;
-  let editedX = 0;
-  let editedY = 0;
+  const editedScaleX = width / editedBitmap.width;
+  const editedScaleY = height / editedSourceHeight;
   if (originalBox) {
     centreX = originalBox.x + originalBox.width / 2;
     centreY = originalBox.y + originalBox.height * 0.38;
     radiusX = originalBox.width * 0.76;
     radiusY = originalBox.height * 0.94;
-  }
-  if (originalBox && editedFace) {
-    const editedBox = editedFace.boundingBox;
-    const uniformScale = ((originalBox.width / editedBox.width) +
-      (originalBox.height / editedBox.height)) / 2;
-    editedScaleX = uniformScale;
-    editedScaleY = uniformScale * (editedBitmap.height / editedSourceHeight);
-    editedX = (originalBox.x + originalBox.width / 2) -
-      (editedBox.x + editedBox.width / 2) * uniformScale;
-    editedY = (originalBox.y + originalBox.height / 2) -
-      (editedBox.y + editedBox.height / 2) * editedScaleY;
   }
 
   const canvas = document.createElement("canvas");
@@ -285,8 +269,8 @@ async function restoreOriginalHead(edited: Blob, originalCrop: Blob, outputName:
     0,
     editedBitmap.width,
     editedSourceHeight,
-    editedX,
-    editedY,
+    0,
+    0,
     editedBitmap.width * editedScaleX,
     editedSourceHeight * editedScaleY,
   );
