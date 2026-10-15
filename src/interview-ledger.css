@@ -69,6 +69,7 @@ input:focus, select:focus, textarea:focus { border-color: #4a907d; box-shadow: 0
 .wordmark b { font-size: 16px; }
 .top-actions, .hero-actions { display: flex; gap: 9px; }
 .quiet { border-color: #ccd6d1; background: #fff; color: #4d5c57; }
+.admin-link { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 .outline { border-color: #ccd6d1; background: transparent; color: #34433e; }
 .excel-button { border-color: var(--forest); background: var(--forest); color: #fff; }
 .hero-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; padding: 42px 0 27px; }
@@ -180,7 +181,7 @@ dialog::backdrop { background: rgba(18,43,37,.46); backdrop-filter: blur(5px); }
   .login-card { width: calc(100% - 28px); }
   .topbar { align-items: flex-start; flex-direction: column; padding: 16px 0; }
   .top-actions, .hero-actions { width: 100%; }
-  .top-actions button, .hero-actions button { flex: 1; }
+  .top-actions :is(button, a), .hero-actions button { flex: 1; }
   .sheet-toolbar { align-items: stretch; flex-direction: column; }
   .sheet-toolbar .ledger-filters { align-items: stretch; flex-direction: column; }
   .search-box { width: 100%; }
