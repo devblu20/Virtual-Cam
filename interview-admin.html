@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <meta name="description" content="Manage access to the Bluqq Interview Ledger." />
+    <title>Interview Access Admin | Bluqq</title>
+  </head>
+  <body>
+    <main class="admin-shell">
+      <header class="topbar">
+        <div class="wordmark"><span>b.</span><div><b>Interview Ledger</b><small>ACCESS ADMIN</small></div></div>
+        <a class="back-link" href="/interview-ledger.html">← Back to ledger</a>
+      </header>
+
+      <section class="hero">
+        <p class="kicker">INTERVIEW ADMINISTRATION</p>
+        <h1>Control who can enter.</h1>
+        <p>Keep Interview Ledger access limited to two approved email addresses.</p>
+      </section>
+
+      <section class="panel unlock-panel" id="unlockPanel">
+        <div class="panel-heading"><span class="panel-number">01</span><div><h2>Administrator access</h2><p>Enter the administrator key to manage the approved emails.</p></div></div>
+        <form id="unlockForm">
+          <label>Administrator key<input id="adminKey" type="password" autocomplete="current-password" placeholder="Enter administrator key" required /></label>
+          <button class="primary" type="submit">Unlock access settings <span>→</span></button>
+          <p class="message" id="unlockMessage" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <section class="panel access-panel" id="accessPanel" hidden>
+        <div class="panel-heading"><span class="panel-number">02</span><div><h2>Approved emails</h2><p>Exactly two people can sign in to the shared Interview Ledger.</p></div><button class="quiet" id="lockButton" type="button">Lock</button></div>
+        <div class="notice"><strong>Shared workspace</strong><span>Both emails use the current Interview Ledger password and see the same candidate records.</span></div>
+        <form id="accessForm">
+          <div class="email-grid">
+            <label>Approved email 1<input id="emailOne" type="email" autocomplete="off" placeholder="name@company.com" required /></label>
+            <label>Approved email 2<input id="emailTwo" type="email" autocomplete="off" placeholder="name@company.com" required /></label>
+          </div>
+          <div class="form-actions"><p class="message" id="accessMessage" aria-live="polite"></p><button class="primary" type="submit">Save access</button></div>
+        </form>
+      </section>
+    </main>
+    <script type="module" src="/src/interview-admin.ts"></script>
+  </body>
+</html>

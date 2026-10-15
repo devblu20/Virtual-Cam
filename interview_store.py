@@ -166,6 +166,10 @@ class InterviewStore:
                 if column not in existing_columns:
                     db.execute(f"ALTER TABLE interviews ADD COLUMN {column} {definition}")
             db.execute("CREATE INDEX IF NOT EXISTS interviews_owner ON interviews(owner)")
+            db.execute("""CREATE TABLE IF NOT EXISTS interview_access (
+                slot INTEGER PRIMARY KEY CHECK(slot IN (1, 2)),
+                email TEXT NOT NULL UNIQUE
+            )""")
             with db:
                 yield db
         except (sqlite3.Error, OSError):
@@ -258,18 +262,41 @@ class InterviewStore:
             if db.execute("DELETE FROM interviews WHERE owner=? AND id=?", (owner, interview_id)).rowcount == 0:
                 raise HTTPException(404, "Interview not found.")
 
+    def access_emails(self):
+        with self.connection() as db:
+            rows = db.execute("SELECT email FROM interview_access ORDER BY slot").fetchall()
+            return [row["email"] for row in rows]
+
+    def set_access_emails(self, emails):
+        with self.connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            db.execute("DELETE FROM interview_access")
+            db.executemany(
+                "INSERT INTO interview_access(slot,email) VALUES(?,?)",
+                ((index + 1, email) for index, email in enumerate(emails)),
+            )
+
 
 def register_interview_routes(app, access_keys):
     store = InterviewStore()
     requests = defaultdict(deque)
     save_lock = asyncio.Lock()
 
+    def authenticate_admin(request):
+        admin_hash = os.getenv("VCAM_ADMIN_KEY_SHA256", "").strip().lower()
+        authorization = request.headers.get("Authorization", "")
+        supplied = authorization[7:] if authorization.startswith("Bearer ") else ""
+        candidate = hashlib.sha256(supplied.encode("utf-8")).hexdigest() if supplied else ""
+        if (not 32 <= len(supplied) <= 256 or not re.fullmatch(r"[a-f0-9]{64}", admin_hash)
+                or admin_hash in access_keys.values() or not hmac.compare_digest(candidate, admin_hash)):
+            raise HTTPException(403, "Administrator access required.")
+
     def authenticate(request):
         authorization = request.headers.get("Authorization", "")
         if authorization.startswith("Basic "):
             try:
                 decoded = base64.b64decode(authorization[6:], validate=True).decode("utf-8")
-                portal_id, password = decoded.split(":", 1)
+                login_name, password = decoded.split(":", 1)
             except (ValueError, UnicodeDecodeError):
                 raise HTTPException(401, "Enter a valid Interview Ledger ID and password.") from None
             expected_id = os.getenv("INTERVIEW_PORTAL_ID", "").strip()
@@ -277,9 +304,16 @@ def register_interview_routes(app, access_keys):
             if not expected_id or not re.fullmatch(r"[a-f0-9]{64}", expected_hash):
                 raise HTTPException(503, "Interview Ledger login is not configured yet.")
             candidate_hash = hashlib.sha256(password.encode()).hexdigest()
-            if not (hmac.compare_digest(portal_id, expected_id) and hmac.compare_digest(candidate_hash, expected_hash)):
-                raise HTTPException(401, "Interview Ledger ID or password is incorrect.")
-            owner = "portal-" + hashlib.sha256(portal_id.encode()).hexdigest()[:24]
+            approved_emails = store.access_emails()
+            normalized_login = login_name.strip().lower()
+            approved_login = (
+                normalized_login in approved_emails if len(approved_emails) == 2
+                else hmac.compare_digest(login_name, expected_id)
+            )
+            if not (approved_login and hmac.compare_digest(candidate_hash, expected_hash)):
+                raise HTTPException(401, "Email or password is incorrect.")
+            # Keep the established workspace owner so both approved emails share all existing records.
+            owner = "portal-" + hashlib.sha256(expected_id.encode()).hexdigest()[:24]
             bucket = requests[owner]
             now = time.monotonic()
             while bucket and now - bucket[0] >= 60:
@@ -319,6 +353,35 @@ def register_interview_routes(app, access_keys):
         if type(rating) is not int or not 0 <= rating <= 5:
             raise HTTPException(400, "Choose a rating from 1 to 5, or leave it unrated.")
         return status, notes.strip(), rating
+
+    @app.get("/api/admin/interview-access")
+    async def get_interview_access(request: Request):
+        authenticate_admin(request)
+        emails = await run_in_threadpool(store.access_emails)
+        return {"emails": emails, "limit": 2}
+
+    @app.put("/api/admin/interview-access")
+    async def update_interview_access(request: Request):
+        authenticate_admin(request)
+        if request.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
+            raise HTTPException(415, "Send access details as JSON.")
+        try:
+            payload = await request.json()
+        except (ValueError, UnicodeDecodeError):
+            raise HTTPException(400, "Access details could not be read.") from None
+        emails = payload.get("emails") if isinstance(payload, dict) else None
+        if not isinstance(emails, list) or len(emails) != 2:
+            raise HTTPException(400, "Enter exactly two email addresses.")
+        normalized = []
+        email_pattern = re.compile(r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$")
+        for email in emails:
+            if not isinstance(email, str) or len(email.strip()) > 254 or not email_pattern.fullmatch(email.strip()):
+                raise HTTPException(400, "Enter two valid email addresses.")
+            normalized.append(email.strip().lower())
+        if normalized[0] == normalized[1]:
+            raise HTTPException(400, "Use two different email addresses.")
+        await run_in_threadpool(store.set_access_emails, normalized)
+        return {"emails": normalized, "limit": 2}
 
     @app.get("/api/interviews")
     async def list_interviews(request: Request):
