@@ -15,7 +15,7 @@ form.addEventListener('submit', async event => {
     const result = await response.json();
     if (!response.ok) throw new Error(result.detail || 'Sign-in failed. Please try again.');
     document.getElementById('password').value = '';
-    window.location.replace('/');
+    window.location.replace('/index.html');
   } catch (error) {
     message.textContent = error.name === 'TimeoutError' ? 'Sign-in timed out. Please try again.' : error.message;
     button.disabled = false;

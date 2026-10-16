@@ -19,7 +19,7 @@ import uvicorn
 from decart import DecartClient
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from reference_library import register_reference_routes
 from usage_history import register_usage_routes, small_json, usage_metadata
@@ -391,10 +391,6 @@ def create_app() -> FastAPI:
     website_login.register(app, dist)
 
     if dist.is_dir():
-        @app.get("/", include_in_schema=False)
-        async def interview_ledger_home():
-            return FileResponse(dist / "interview-ledger.html")
-
         app.mount("/", StaticFiles(directory=dist, html=True), name="frontend")
     else:
         @app.get("/")
