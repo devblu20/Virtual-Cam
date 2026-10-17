@@ -10,7 +10,7 @@ from collections import defaultdict, deque
 from urllib.parse import urlsplit
 
 from fastapi import Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from starlette.concurrency import run_in_threadpool
 
 COOKIE = "vcam_session"
@@ -78,12 +78,6 @@ class WebsiteLogin:
             return response
 
         @app.get("/")
-        async def interview_ledger_home():
-            page = dist / "interview-ledger.html"
-            if not page.is_file():
-                return JSONResponse({"detail": "Run npm ci and npm run build first."}, status_code=503)
-            return FileResponse(page)
-
         @app.get("/index.html")
         async def studio(request: Request):
             if self.enabled:
