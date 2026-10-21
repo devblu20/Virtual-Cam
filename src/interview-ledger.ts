@@ -3,6 +3,7 @@ import "./interview-ledger.css";
 type InterviewStatus = "Scheduled" | "Completed" | "Selected" | "Rejected" | "Cancelled";
 type Interview = { id: string; candidateName: string; interviewDate: string; startTime: string; duration: number; photoName: string; resumeName: string; createdAt: number; thumbnail: string; status: InterviewStatus; notes: string; rating: number };
 type ManagedUser = { id: string; name: string };
+type AccessEntry = { email: string; role: "workspace" | "admin" | "both"; owner: boolean; active: boolean; createdAt: number };
 type GoogleCredentialResponse = { credential?: string };
 type GoogleIdentity = {
   accounts: { id: {
@@ -38,6 +39,7 @@ const adminDashboard = document.body.hasAttribute("data-admin-dashboard");
 let credentials = "";
 let interviews: Interview[] = [];
 let managedUsers: ManagedUser[] = [];
+let accessEntries: AccessEntry[] = [];
 let editing: Interview | null = null;
 const presetDurations = new Set([15, 30, 45, 60, 90, 120, 150, 180, 240]);
 
@@ -160,12 +162,79 @@ async function load() {
     if (adminDashboard) {
       const userResponse = await request("/api/interview-admin/users");
       managedUsers = ((await userResponse.json()) as { users: ManagedUser[] }).users;
+      await loadAccessManagement();
     }
     sheetMessage.textContent = interviews.length ? `${interviews.length} record${interviews.length === 1 ? "" : "s"} ready.` : "";
     render();
   } catch (error) {
     sheetMessage.textContent = error instanceof Error ? error.message : "Could not load interviews.";
     throw error;
+  }
+}
+
+function accessRoleLabel(role: AccessEntry["role"]) {
+  return role === "both" ? "Both panels" : role === "admin" ? "Admin Panel" : "Private Workspace";
+}
+
+function renderAccess() {
+  const list = document.getElementById("accessList");
+  if (!list) return;
+  list.replaceChildren();
+  accessEntries.forEach(entry => {
+    const row = document.createElement("article");
+    row.className = `access-row${entry.active ? "" : " revoked"}`;
+    row.innerHTML = `<div><strong>${safe(entry.email)}</strong><span>${entry.owner ? "Owner · " : ""}${accessRoleLabel(entry.role)}</span></div><span class="access-state">${entry.active ? "Active" : "Revoked"}</span>${entry.owner ? '<span class="owner-lock">Protected</span>' : entry.active ? '<button class="revoke-access" type="button">Revoke</button>' : '<span class="owner-lock">Add again to restore</span>'}`;
+    row.querySelector<HTMLButtonElement>(".revoke-access")?.addEventListener("click", () => { void revokeAccess(entry); });
+    list.append(row);
+  });
+}
+
+async function loadAccessManagement() {
+  const button = document.getElementById("manageAccessButton") as HTMLButtonElement | null;
+  try {
+    const response = await fetch("/api/interview-admin/access", { headers: { Authorization: credentials }, cache: "no-store" });
+    if (response.status === 403) {
+      if (button) button.hidden = true;
+      return;
+    }
+    if (!response.ok) throw new Error("Access list could not be loaded.");
+    accessEntries = ((await response.json()) as { access: AccessEntry[] }).access;
+    if (button) button.hidden = false;
+    renderAccess();
+  } catch {
+    if (button) button.hidden = true;
+  }
+}
+
+async function saveAccess(event: SubmitEvent) {
+  event.preventDefault();
+  const email = get<HTMLInputElement>("accessEmail").value.trim().toLowerCase();
+  const role = get<HTMLSelectElement>("accessRole").value;
+  const button = get<HTMLButtonElement>("saveAccessButton");
+  const message = get("accessMessage");
+  button.disabled = true;
+  message.textContent = "Saving access…";
+  try {
+    await request("/api/interview-admin/access", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, role }),
+    });
+    get<HTMLFormElement>("accessForm").reset();
+    await loadAccessManagement();
+    message.textContent = `Access saved for ${email}.`;
+  } catch (error) {
+    message.textContent = error instanceof Error ? error.message : "Access could not be saved.";
+  } finally { button.disabled = false; }
+}
+
+async function revokeAccess(entry: AccessEntry) {
+  const message = get("accessMessage");
+  message.textContent = `Revoking ${entry.email}…`;
+  try {
+    await request(`/api/interview-admin/access/${encodeURIComponent(entry.email)}`, { method: "DELETE" });
+    await loadAccessManagement();
+    message.textContent = `Access revoked for ${entry.email}.`;
+  } catch (error) {
+    message.textContent = error instanceof Error ? error.message : "Access could not be revoked.";
   }
 }
 
@@ -327,7 +396,12 @@ get<HTMLFormElement>("loginForm").onsubmit = async event => {
   const password = get<HTMLInputElement>("portalPassword").value;
   await openWorkspace(basic(id, password));
 };
-get("logoutButton").onclick = () => { credentials = ""; interviews = []; window.google?.accounts.id.disableAutoSelect(); ledgerView.hidden = true; loginView.hidden = false; get<HTMLInputElement>("portalPassword").value = ""; };
+get("logoutButton").onclick = () => {
+  credentials = ""; interviews = []; accessEntries = []; window.google?.accounts.id.disableAutoSelect();
+  ledgerView.hidden = true; loginView.hidden = false; get<HTMLInputElement>("portalPassword").value = "";
+  const accessPanel = document.getElementById("accessPanel");
+  if (accessPanel) accessPanel.hidden = true;
+};
 get("newInterviewButton").onclick = () => openDialog();
 get("emptyAddButton").onclick = () => openDialog();
 get("closeDialogButton").onclick = () => dialog.close();
@@ -353,4 +427,11 @@ durationInput.onchange = () => {
   else customDurationInput.value = "";
 };
 form.addEventListener("submit", save);
+if (adminDashboard) {
+  get<HTMLButtonElement>("manageAccessButton").onclick = () => {
+    const panel = get("accessPanel"); panel.hidden = false; panel.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  get<HTMLButtonElement>("closeAccessButton").onclick = () => { get("accessPanel").hidden = true; };
+  get<HTMLFormElement>("accessForm").addEventListener("submit", saveAccess);
+}
 void setupGoogleSignIn();

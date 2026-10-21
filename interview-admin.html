@@ -46,14 +46,14 @@
             <div class="login-divider"><span>or</span></div>
             <div class="google-signin" id="googleSignIn"></div>
           </div>
-          <p class="security-note">Only the two approved administrator emails can open this dashboard.</p>
+          <p class="security-note">Only approved administrator emails can open this dashboard.</p>
         </div>
       </section>
 
       <section class="ledger-view" id="ledgerView" hidden>
         <header class="topbar">
           <div class="wordmark"><span>b.</span><div><b>Interview Admin</b><small>BY BLUQQ</small></div></div>
-          <div class="top-actions"><a class="quiet admin-link" href="/interview-ledger.html">← Interview Ledger</a><button class="quiet" id="logoutButton" type="button">Log out</button><button class="primary" id="newInterviewButton" type="button">＋ New interview</button></div>
+          <div class="top-actions"><button class="quiet" id="manageAccessButton" type="button" hidden>Manage access</button><a class="quiet admin-link" href="/interview-ledger.html">← Interview Ledger</a><button class="quiet" id="logoutButton" type="button">Log out</button><button class="primary" id="newInterviewButton" type="button">＋ New interview</button></div>
         </header>
         <section class="hero-row">
           <div><p class="kicker">INTERVIEW OPERATIONS</p><h1>Candidate schedule</h1><p>One workspace for every upcoming conversation.</p></div>
@@ -63,6 +63,20 @@
           <article><small>Total interviews</small><strong id="totalCount">0</strong></article>
           <article><small>Upcoming</small><strong id="upcomingCount">0</strong></article>
           <article><small>Total interview time</small><strong id="totalMinutes">0 min</strong></article>
+        </section>
+        <section class="access-card" id="accessPanel" hidden>
+          <div class="access-heading">
+            <div><p class="kicker">ACCESS MANAGEMENT</p><h2>Approved Google accounts</h2><p>Add an email and choose exactly which panel it can open.</p></div>
+            <button class="close-button" id="closeAccessButton" type="button" aria-label="Close access management">×</button>
+          </div>
+          <form class="access-form" id="accessForm">
+            <label>Email address<input id="accessEmail" type="email" autocomplete="off" maxlength="254" placeholder="name@company.com" required /></label>
+            <label>Access<select id="accessRole" required><option value="workspace">Private Workspace</option><option value="admin">Admin Panel</option><option value="both">Both panels</option></select></label>
+            <button class="primary" id="saveAccessButton" type="submit">Give access</button>
+          </form>
+          <p class="access-help">New accounts sign in with Google. Owners can manage access; owner access cannot be removed.</p>
+          <p class="message" id="accessMessage" aria-live="polite"></p>
+          <div class="access-list" id="accessList"></div>
         </section>
         <section class="sheet-card">
           <div class="sheet-toolbar">

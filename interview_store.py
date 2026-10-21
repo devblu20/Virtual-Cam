@@ -35,6 +35,7 @@ INTERVIEW_ADMIN_CREDENTIALS = {
     "harshitakothari2703@gmail.com": "2d24d533562b532e162640dde496257e54aee68440f0bb26aee7b871273497bd",
     "devblu.work@gmail.com": "bd03f224ac6c5069831826865e773836d2a5023bec835663cc31eb72e6997f25",
 }
+INTERVIEW_OWNER_EMAILS = frozenset(INTERVIEW_ADMIN_CREDENTIALS)
 PHOTO_MIMES = {"image/jpeg", "image/png", "image/webp"}
 RESUME_MIMES = {
     "application/pdf": "pdf",
@@ -172,6 +173,18 @@ class InterviewStore:
                 if column not in existing_columns:
                     db.execute(f"ALTER TABLE interviews ADD COLUMN {column} {definition}")
             db.execute("CREATE INDEX IF NOT EXISTS interviews_owner ON interviews(owner)")
+            db.execute("""CREATE TABLE IF NOT EXISTS interview_access (
+                email TEXT PRIMARY KEY, workspace INTEGER NOT NULL, admin INTEGER NOT NULL,
+                owner INTEGER NOT NULL, active INTEGER NOT NULL, created INTEGER NOT NULL,
+                created_by TEXT NOT NULL, modified INTEGER NOT NULL
+            )""")
+            now = int(time.time())
+            for email in INTERVIEW_OWNER_EMAILS:
+                db.execute("""INSERT OR IGNORE INTO interview_access
+                    (email,workspace,admin,owner,active,created,created_by,modified)
+                    VALUES (?,?,?,?,?,?,?,?)""", (email, 1, 1, 1, 1, now, "system", now))
+                db.execute("""UPDATE interview_access SET workspace=1,admin=1,owner=1,active=1
+                    WHERE email=?""", (email,))
             with db:
                 yield db
         except (sqlite3.Error, OSError):
@@ -271,6 +284,51 @@ class InterviewStore:
             if db.execute("DELETE FROM interviews WHERE owner=? AND id=?", (owner, interview_id)).rowcount == 0:
                 raise HTTPException(404, "Interview not found.")
 
+    @staticmethod
+    def access_metadata(row):
+        role = "both" if row["workspace"] and row["admin"] else "admin" if row["admin"] else "workspace"
+        return {"email": row["email"], "role": role, "owner": bool(row["owner"]),
+                "active": bool(row["active"]), "createdAt": row["created"]}
+
+    def access_allowed(self, email, permission):
+        column = "admin" if permission == "admin" else "workspace"
+        with self.connection() as db:
+            row = db.execute(f"SELECT active,{column} FROM interview_access WHERE email=?", (email,)).fetchone()
+            return bool(row and row["active"] and row[column])
+
+    def access_owner(self, email):
+        with self.connection() as db:
+            row = db.execute("SELECT active,owner FROM interview_access WHERE email=?", (email,)).fetchone()
+            return bool(row and row["active"] and row["owner"])
+
+    def list_access(self):
+        with self.connection() as db:
+            rows = db.execute("""SELECT email,workspace,admin,owner,active,created
+                FROM interview_access ORDER BY owner DESC,active DESC,email""").fetchall()
+            return {"access": [self.access_metadata(row) for row in rows]}
+
+    def save_access(self, email, role, administrator):
+        workspace = int(role in {"workspace", "both"})
+        admin = int(role in {"admin", "both"})
+        now = int(time.time())
+        with self.connection() as db:
+            db.execute("""INSERT INTO interview_access
+                (email,workspace,admin,owner,active,created,created_by,modified)
+                VALUES (?,?,?,?,?,?,?,?)
+                ON CONFLICT(email) DO UPDATE SET workspace=excluded.workspace,admin=excluded.admin,
+                active=1,modified=excluded.modified""",
+                (email, workspace, admin, 0, 1, now, administrator, now))
+            row = db.execute("""SELECT email,workspace,admin,owner,active,created
+                FROM interview_access WHERE email=?""", (email,)).fetchone()
+            return self.access_metadata(row)
+
+    def revoke_access(self, email):
+        if email in INTERVIEW_OWNER_EMAILS:
+            raise HTTPException(409, "Owner access cannot be revoked.")
+        with self.connection() as db:
+            if db.execute("UPDATE interview_access SET active=0,modified=? WHERE email=?", (int(time.time()), email)).rowcount == 0:
+                raise HTTPException(404, "Access record not found.")
+
 def register_interview_routes(app, access_keys):
     store = InterviewStore()
     requests = defaultdict(deque)
@@ -291,8 +349,8 @@ def register_interview_routes(app, access_keys):
         except (ValueError, OSError):
             raise HTTPException(401, "Google sign-in expired or could not be verified.") from None
         email = claims.get("email", "").strip().lower()
-        if claims.get("email_verified") is not True or email not in INTERVIEW_ADMIN_CREDENTIALS:
-            raise HTTPException(403, "This Google account is not approved for this workspace.")
+        if claims.get("email_verified") is not True or not email:
+            raise HTTPException(403, "This Google account could not be verified.")
         return email
 
     def portal_owner():
@@ -309,6 +367,8 @@ def register_interview_routes(app, access_keys):
     def authenticate_interview_admin(request):
         email = google_email(request)
         if email:
+            if not store.access_allowed(email, "admin"):
+                raise HTTPException(403, "This Google account does not have Admin Panel access.")
             return email, portal_owner()
         authorization = request.headers.get("Authorization", "")
         try:
@@ -329,6 +389,8 @@ def register_interview_routes(app, access_keys):
     def authenticate(request):
         email = google_email(request)
         if email:
+            if not store.access_allowed(email, "workspace"):
+                raise HTTPException(403, "This Google account does not have Private Workspace access.")
             owner = portal_owner()
             bucket = requests[owner]
             now = time.monotonic()
@@ -428,6 +490,42 @@ def register_interview_routes(app, access_keys):
             for user in listing["users"] if user.get("active")
         ]
         return {"users": users}
+
+    def authenticate_access_owner(request):
+        administrator, _ = authenticate_interview_admin(request)
+        if not store.access_owner(administrator):
+            raise HTTPException(403, "Only an owner can manage email access.")
+        return administrator
+
+    @app.get("/api/interview-admin/access")
+    async def interview_admin_access(request: Request):
+        authenticate_access_owner(request)
+        return await run_in_threadpool(store.list_access)
+
+    @app.post("/api/interview-admin/access", status_code=201)
+    async def save_interview_admin_access(request: Request):
+        administrator = authenticate_access_owner(request)
+        if request.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
+            raise HTTPException(415, "Send access details as JSON.")
+        try:
+            payload = await request.json()
+        except (ValueError, UnicodeDecodeError):
+            raise HTTPException(400, "Access details could not be read.") from None
+        email = payload.get("email", "").strip().lower() if isinstance(payload, dict) else ""
+        role = payload.get("role", "") if isinstance(payload, dict) else ""
+        if len(email) > 254 or not re.fullmatch(r"[^@\s]{1,64}@[^@\s]{1,189}", email):
+            raise HTTPException(400, "Enter a valid email address.")
+        if role not in {"workspace", "admin", "both"}:
+            raise HTTPException(400, "Choose Private Workspace, Admin Panel or Both.")
+        return await run_in_threadpool(store.save_access, email, role, administrator)
+
+    @app.delete("/api/interview-admin/access/{email}", status_code=204)
+    async def revoke_interview_admin_access(email: str, request: Request):
+        authenticate_access_owner(request)
+        normalized = email.strip().lower()
+        if len(normalized) > 254 or not re.fullmatch(r"[^@\s]{1,64}@[^@\s]{1,189}", normalized):
+            raise HTTPException(404, "Access record not found.")
+        await run_in_threadpool(store.revoke_access, normalized)
 
     @app.post("/api/interview-admin/interviews/{interview_id}/photo", status_code=201)
     async def assign_interview_photo(interview_id: str, request: Request):
