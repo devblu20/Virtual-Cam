@@ -64,20 +64,6 @@
           <article><small>Upcoming</small><strong id="upcomingCount">0</strong></article>
           <article><small>Total interview time</small><strong id="totalMinutes">0 min</strong></article>
         </section>
-        <section class="access-card" id="accessPanel" hidden>
-          <div class="access-heading">
-            <div><p class="kicker">ACCESS MANAGEMENT</p><h2>Approved Google accounts</h2><p>Add an email and choose exactly which panel it can open.</p></div>
-            <button class="close-button" id="closeAccessButton" type="button" aria-label="Close access management">×</button>
-          </div>
-          <form class="access-form" id="accessForm">
-            <label>Email address<input id="accessEmail" type="email" autocomplete="off" maxlength="254" placeholder="name@company.com" required /></label>
-            <label>Access<select id="accessRole" required><option value="workspace">Private Workspace</option><option value="admin">Admin Panel</option><option value="both">Both panels</option></select></label>
-            <button class="primary" id="saveAccessButton" type="submit">Give access</button>
-          </form>
-          <p class="access-help">New accounts sign in with Google. Owners can manage access; owner access cannot be removed.</p>
-          <p class="message" id="accessMessage" aria-live="polite"></p>
-          <div class="access-list" id="accessList"></div>
-        </section>
         <section class="sheet-card">
           <div class="sheet-toolbar">
             <div><span class="sheet-icon">▦</span><div><b>Interview data</b><small>Live Excel-style register</small></div></div>
@@ -100,6 +86,23 @@
         <footer>Private Interview Ledger · A product by <strong>Bluqq</strong></footer>
       </section>
     </main>
+
+    <dialog id="accessDialog" class="access-dialog">
+      <section class="access-card">
+        <div class="access-heading">
+          <div><p class="kicker">ACCESS MANAGEMENT</p><h2>Approved Google accounts</h2><p>Add an email and choose exactly which panel it can open.</p></div>
+          <button class="close-button" id="closeAccessButton" type="button" aria-label="Close access management">×</button>
+        </div>
+        <form class="access-form" id="accessForm">
+          <label>Email address<input id="accessEmail" type="email" autocomplete="off" maxlength="254" placeholder="name@company.com" required /></label>
+          <label>Access<select id="accessRole" required><option value="workspace">Private Workspace</option><option value="admin">Admin Panel</option><option value="both">Both panels</option></select></label>
+          <button class="primary" id="saveAccessButton" type="submit">Give access</button>
+        </form>
+        <p class="access-help">New accounts sign in with Google. Owners can manage access; owner access cannot be removed.</p>
+        <p class="message" id="accessMessage" aria-live="polite"></p>
+        <div class="access-list" id="accessList"></div>
+      </section>
+    </dialog>
 
     <dialog id="interviewDialog">
       <form class="dialog-card" id="ledgerForm" method="dialog">

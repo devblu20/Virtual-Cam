@@ -399,8 +399,8 @@ get<HTMLFormElement>("loginForm").onsubmit = async event => {
 get("logoutButton").onclick = () => {
   credentials = ""; interviews = []; accessEntries = []; window.google?.accounts.id.disableAutoSelect();
   ledgerView.hidden = true; loginView.hidden = false; get<HTMLInputElement>("portalPassword").value = "";
-  const accessPanel = document.getElementById("accessPanel");
-  if (accessPanel) accessPanel.hidden = true;
+  const accessDialog = document.getElementById("accessDialog") as HTMLDialogElement | null;
+  if (accessDialog?.open) accessDialog.close();
 };
 get("newInterviewButton").onclick = () => openDialog();
 get("emptyAddButton").onclick = () => openDialog();
@@ -429,9 +429,9 @@ durationInput.onchange = () => {
 form.addEventListener("submit", save);
 if (adminDashboard) {
   get<HTMLButtonElement>("manageAccessButton").onclick = () => {
-    const panel = get("accessPanel"); panel.hidden = false; panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    get<HTMLDialogElement>("accessDialog").showModal();
   };
-  get<HTMLButtonElement>("closeAccessButton").onclick = () => { get("accessPanel").hidden = true; };
+  get<HTMLButtonElement>("closeAccessButton").onclick = () => { get<HTMLDialogElement>("accessDialog").close(); };
   get<HTMLFormElement>("accessForm").addEventListener("submit", saveAccess);
 }
 void setupGoogleSignIn();
