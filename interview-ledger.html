@@ -6,6 +6,7 @@
     <meta name="color-scheme" content="light" />
     <meta name="description" content="Bluqq Interview Ledger — a clean interview schedule and Excel workspace." />
     <title>Interview Ledger | Bluqq</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
   <body>
     <main class="ledger-shell">
@@ -41,6 +42,10 @@
             <button class="primary wide" type="submit">Open Interview Ledger <span>→</span></button>
             <p class="message" id="loginMessage" aria-live="polite"></p>
           </form>
+          <div class="google-login" id="googleLogin" hidden>
+            <div class="login-divider"><span>or</span></div>
+            <div class="google-signin" id="googleSignIn"></div>
+          </div>
           <p class="security-note">Credentials remain only in this tab and are never saved in browser storage.</p>
         </div>
       </section>

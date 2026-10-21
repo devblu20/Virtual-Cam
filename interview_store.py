@@ -19,6 +19,8 @@ from xml.sax.saxutils import escape
 
 from fastapi import HTTPException, Request
 from fastapi.responses import Response
+from google.auth.transport.requests import Request as GoogleRequest
+from google.oauth2 import id_token as google_id_token
 from PIL import Image, ImageOps
 from starlette.concurrency import run_in_threadpool
 
@@ -274,7 +276,40 @@ def register_interview_routes(app, access_keys):
     requests = defaultdict(deque)
     save_lock = asyncio.Lock()
 
+    def google_email(request):
+        authorization = request.headers.get("Authorization", "")
+        token = authorization[7:] if authorization.startswith("Google ") else ""
+        if not token:
+            return None
+        client_id = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+        if not client_id:
+            raise HTTPException(503, "Google sign-in is not configured yet.")
+        if len(token) > 8192:
+            raise HTTPException(401, "Google sign-in could not be verified.")
+        try:
+            claims = google_id_token.verify_oauth2_token(token, GoogleRequest(), client_id)
+        except (ValueError, OSError):
+            raise HTTPException(401, "Google sign-in expired or could not be verified.") from None
+        email = claims.get("email", "").strip().lower()
+        if claims.get("email_verified") is not True or email not in INTERVIEW_ADMIN_CREDENTIALS:
+            raise HTTPException(403, "This Google account is not approved for this workspace.")
+        return email
+
+    def portal_owner():
+        expected_id = os.getenv("INTERVIEW_PORTAL_ID", "").strip()
+        if not expected_id:
+            raise HTTPException(503, "Interview login is not configured yet.")
+        return "portal-" + hashlib.sha256(expected_id.encode()).hexdigest()[:24]
+
+    @app.get("/api/interview-admin/google-config")
+    async def interview_google_config():
+        client_id = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+        return {"clientId": client_id if len(client_id) <= 256 else ""}
+
     def authenticate_interview_admin(request):
+        email = google_email(request)
+        if email:
+            return email, portal_owner()
         authorization = request.headers.get("Authorization", "")
         try:
             decoded = base64.b64decode(authorization[6:], validate=True).decode("utf-8") if authorization.startswith("Basic ") else ""
@@ -289,10 +324,20 @@ def register_interview_routes(app, access_keys):
         expected_hash = INTERVIEW_ADMIN_CREDENTIALS.get(email, "")
         if not expected_hash or not hmac.compare_digest(candidate_hash, expected_hash):
             raise HTTPException(401, "Email or password is incorrect.")
-        owner = "portal-" + hashlib.sha256(expected_id.encode()).hexdigest()[:24]
-        return email, owner
+        return email, portal_owner()
 
     def authenticate(request):
+        email = google_email(request)
+        if email:
+            owner = portal_owner()
+            bucket = requests[owner]
+            now = time.monotonic()
+            while bucket and now - bucket[0] >= 60:
+                bucket.popleft()
+            if len(bucket) >= 90:
+                raise HTTPException(429, "Too many interview requests. Try again in a minute.")
+            bucket.append(now)
+            return owner
         authorization = request.headers.get("Authorization", "")
         if authorization.startswith("Basic "):
             try:

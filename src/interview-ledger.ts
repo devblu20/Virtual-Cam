@@ -3,6 +3,15 @@ import "./interview-ledger.css";
 type InterviewStatus = "Scheduled" | "Completed" | "Selected" | "Rejected" | "Cancelled";
 type Interview = { id: string; candidateName: string; interviewDate: string; startTime: string; duration: number; photoName: string; resumeName: string; createdAt: number; thumbnail: string; status: InterviewStatus; notes: string; rating: number };
 type ManagedUser = { id: string; name: string };
+type GoogleCredentialResponse = { credential?: string };
+type GoogleIdentity = {
+  accounts: { id: {
+    initialize: (options: { client_id: string; callback: (response: GoogleCredentialResponse) => void; auto_select?: boolean }) => void;
+    renderButton: (element: HTMLElement, options: Record<string, unknown>) => void;
+    disableAutoSelect: () => void;
+  } };
+};
+declare global { interface Window { google?: GoogleIdentity; } }
 const get = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const loginView = get<HTMLElement>("loginView");
 const ledgerView = get<HTMLElement>("ledgerView");
@@ -41,6 +50,50 @@ function basic(id: string, password: string) {
   let binary = "";
   bytes.forEach(byte => binary += String.fromCharCode(byte));
   return `Basic ${btoa(binary)}`;
+}
+
+async function openWorkspace(nextCredentials: string) {
+  const message = get("loginMessage");
+  credentials = nextCredentials;
+  message.textContent = "Opening workspace…";
+  try {
+    await load();
+    loginView.hidden = true;
+    ledgerView.hidden = false;
+    message.textContent = "";
+  } catch (error) {
+    credentials = "";
+    message.textContent = error instanceof Error ? error.message : "Login failed.";
+  }
+}
+
+async function setupGoogleSignIn() {
+  const container = get<HTMLElement>("googleLogin");
+  try {
+    const response = await fetch("/api/interview-admin/google-config", { cache: "no-store" });
+    const config = await response.json() as { clientId?: string };
+    if (!response.ok || !config.clientId) return;
+    for (let attempt = 0; attempt < 50 && !window.google; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    if (!window.google) return;
+    window.google.accounts.id.initialize({
+      client_id: config.clientId,
+      auto_select: false,
+      callback: googleResponse => {
+        if (!googleResponse.credential) {
+          get("loginMessage").textContent = "Google sign-in did not return a valid account.";
+          return;
+        }
+        void openWorkspace(`Google ${googleResponse.credential}`);
+      },
+    });
+    window.google.accounts.id.renderButton(get("googleSignIn"), {
+      type: "standard", theme: "outline", size: "large", text: "signin_with",
+      shape: "rectangular", logo_alignment: "left", width: 340,
+    });
+    container.hidden = false;
+  } catch { /* Keep the existing password login available if Google is unavailable. */ }
 }
 
 async function request(path: string, options: RequestInit = {}) {
@@ -272,12 +325,9 @@ get<HTMLFormElement>("loginForm").onsubmit = async event => {
   event.preventDefault();
   const id = get<HTMLInputElement>("portalId").value.trim();
   const password = get<HTMLInputElement>("portalPassword").value;
-  credentials = basic(id, password);
-  const message = get("loginMessage"); message.textContent = "Opening workspace…";
-  try { await load(); loginView.hidden = true; ledgerView.hidden = false; message.textContent = ""; }
-  catch (error) { credentials = ""; message.textContent = error instanceof Error ? error.message : "Login failed."; }
+  await openWorkspace(basic(id, password));
 };
-get("logoutButton").onclick = () => { credentials = ""; interviews = []; ledgerView.hidden = true; loginView.hidden = false; get<HTMLInputElement>("portalPassword").value = ""; };
+get("logoutButton").onclick = () => { credentials = ""; interviews = []; window.google?.accounts.id.disableAutoSelect(); ledgerView.hidden = true; loginView.hidden = false; get<HTMLInputElement>("portalPassword").value = ""; };
 get("newInterviewButton").onclick = () => openDialog();
 get("emptyAddButton").onclick = () => openDialog();
 get("closeDialogButton").onclick = () => dialog.close();
@@ -303,3 +353,4 @@ durationInput.onchange = () => {
   else customDurationInput.value = "";
 };
 form.addEventListener("submit", save);
+void setupGoogleSignIn();

@@ -61,6 +61,11 @@ input:focus, select:focus, textarea:focus { border-color: #4a907d; box-shadow: 0
 .wide { display: flex; justify-content: space-between; margin-top: 4px; padding: 14px 16px; }
 .security-note { margin: 24px 0 0; color: #89958f; font-size: 9px; line-height: 1.55; text-align: center; }
 .message { min-height: 18px; margin: 0; color: #b33f4d; font-size: 11px; }
+.google-login { margin-top: 4px; }
+.login-divider { display: flex; align-items: center; gap: 12px; margin: 17px 0; color: #8a9691; font-size: 10px; text-transform: uppercase; }
+.login-divider::before, .login-divider::after { height: 1px; flex: 1; background: #e1e6e3; content: ""; }
+.google-signin { display: flex; min-height: 44px; justify-content: center; }
+.google-signin > div { width: 100% !important; }
 
 body[data-admin-dashboard] .login-view { grid-template-columns: minmax(560px, 1.05fr) minmax(440px, .95fr); background: linear-gradient(90deg, #fafbf9 0 52.5%, #f0f2f0 52.5% 100%); }
 body[data-admin-dashboard] .login-showcase { padding: 132px 5.5vw 42px; background: radial-gradient(circle at 88% 12%, rgba(47,115,95,.08) 0 16%, transparent 16.3%), radial-gradient(circle at 12% 90%, rgba(47,115,95,.055) 0 20%, transparent 20.3%), #fafbf9; }
