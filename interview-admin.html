@@ -134,6 +134,52 @@
         <div class="candidate-panel-actions"><button class="quiet" id="candidateResumeButton" type="button">↓ Download résumé</button><button class="primary" id="candidateEditButton" type="button">Edit details</button></div>
       </article>
     </dialog>
+
+    <dialog id="geminiPhotoDialog" class="gemini-photo-dialog" aria-labelledby="geminiPhotoTitle">
+      <article class="gemini-photo-card">
+        <div class="gemini-editor-heading">
+          <div class="gemini-editor-title"><span class="gemini-mark" aria-hidden="true">✦</span><div><p class="kicker">ADMIN PHOTO STUDIO</p><h2 id="geminiPhotoTitle">Professional portrait edit</h2><p id="geminiCandidateLabel">Generate a professional shirt edit for this candidate.</p></div></div>
+          <div class="gemini-heading-meta"><span>Gemini powered</span><span>Admin only</span></div>
+          <button class="close-button" id="closeGeminiPhotoButton" type="button" aria-label="Close Gemini photo editor">×</button>
+        </div>
+        <div class="gemini-stepbar" aria-label="Photo editing steps"><span class="active"><b>1</b>Style</span><i></i><span><b>2</b>Preview</span><i></i><span><b>3</b>Save</span></div>
+        <div class="gemini-workspace">
+          <aside class="gemini-control-panel">
+            <section class="gemini-control-section">
+              <div class="gemini-section-heading"><span>01</span><div><strong>Shirt styling</strong><small>Choose a polished, interview-ready look.</small></div></div>
+              <label>Shirt colour</label>
+              <div class="gemini-colour-presets" aria-label="Shirt colour presets">
+                <button class="active" type="button" data-gemini-colour="#efb4be" data-gemini-name="soft blush pink" style="--preset:#efb4be"><span></span>Blush</button>
+                <button type="button" data-gemini-colour="#dfe7ef" data-gemini-name="crisp powder blue" style="--preset:#dfe7ef"><span></span>Sky</button>
+                <button type="button" data-gemini-colour="#f3f0e8" data-gemini-name="warm ivory" style="--preset:#f3f0e8"><span></span>Ivory</button>
+                <button type="button" data-gemini-colour="#1f2a37" data-gemini-name="deep navy blue" style="--preset:#1f2a37"><span></span>Navy</button>
+              </div>
+              <span class="gemini-colour-control"><input id="geminiPhotoColourPicker" type="color" value="#efb4be" aria-label="Pick a custom shirt colour" /><input id="geminiPhotoColour" type="text" maxlength="80" value="soft blush pink" aria-label="Shirt colour description" /></span>
+              <div class="gemini-control-grid">
+                <label>Edit type<select id="geminiPhotoMode"><option value="auto">Smart replace</option><option value="recolor">Recolour existing shirt</option></select></label>
+                <label>Fabric finish<select id="geminiPhotoWrinkles"><option value="natural">Natural</option><option value="visible" selected>Authentic texture</option><option value="strong">Relaxed wrinkles</option></select></label>
+              </div>
+            </section>
+            <section class="gemini-control-section">
+              <div class="gemini-section-heading"><span>02</span><div><strong>Composition</strong><small>Keep the portrait consistent for interviews.</small></div></div>
+              <div class="gemini-control-grid">
+                <label>Framing<select id="geminiPhotoFraming"><option value="original">Keep original</option><option value="auto" selected>Smart crop</option></select></label>
+                <label id="geminiPhotoRatioLabel">Output shape<select id="geminiPhotoRatio"><option value="4:5">4:5 portrait</option><option value="3:4">3:4 portrait</option><option value="1:1">1:1 square</option></select></label>
+              </div>
+            </section>
+            <div class="gemini-safety-note"><span>✓</span><p><strong>Review before replacing</strong>Your saved photo stays unchanged until you approve the result.</p></div>
+          </aside>
+          <section class="gemini-preview-panel">
+            <div class="gemini-preview-heading"><div><span>03</span><strong>Compare and approve</strong></div><small>Original stays protected</small></div>
+            <div class="gemini-photo-preview">
+              <figure><figcaption><span>Original</span><small>Current candidate photo</small></figcaption><div class="gemini-image-stage"><img id="geminiPhotoOriginal" alt="Original candidate portrait" /></div></figure>
+              <figure class="gemini-output-frame"><figcaption><span>Gemini preview</span><small>Generated result</small></figcaption><div class="gemini-image-stage"><img id="geminiPhotoOutput" alt="Gemini edited candidate portrait" /><span id="geminiPhotoPlaceholder"><b>✦</b>Choose your settings, then create a preview.</span></div></figure>
+            </div>
+          </section>
+        </div>
+        <footer class="gemini-editor-footer"><p class="gemini-photo-message" id="geminiPhotoMessage" role="status" aria-live="polite">Loading candidate photo…</p><div class="dialog-actions"><button class="quiet" id="cancelGeminiPhotoButton" type="button">Close</button><button class="gemini-generate" id="generateGeminiPhotoButton" type="button" disabled><span>✦</span>Create preview</button><button class="primary" id="saveGeminiPhotoButton" type="button" hidden>Use this photo</button></div></footer>
+      </article>
+    </dialog>
     <script type="module" src="/src/interview-ledger.ts"></script>
   </body>
 </html>

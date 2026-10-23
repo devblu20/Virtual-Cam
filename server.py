@@ -24,6 +24,11 @@ from fastapi.staticfiles import StaticFiles
 from reference_library import register_reference_routes
 from usage_history import register_usage_routes, small_json, usage_metadata
 from starlette.concurrency import run_in_threadpool
+
+try:
+    from asyncio import timeout as async_timeout
+except ImportError:  # Python 3.10 compatibility
+    from async_timeout import timeout as async_timeout
 from processing_config import load_processing_config
 from managed_users import ManagedUsers, register_managed_routes
 from interview_store import register_interview_routes
@@ -247,7 +252,7 @@ def create_app() -> FastAPI:
                 bucket.append(now)
         usage_id = await record_usage(usage_store.start, user, usage, configuration) if usage else None
         try:
-            async with asyncio.timeout(25):
+            async with async_timeout(25):
                 async with DecartClient(api_key=api_key) as client:
                     token = await client.tokens.create(
                         expires_in=120,
@@ -271,18 +276,27 @@ def create_app() -> FastAPI:
             logger.warning("Decart token request failed")
             raise HTTPException(502, "AI processing connection failed. Ask Bluqq support to check service access and credits.") from None
 
-    async def generate_reference_edit(request: Request, user: str, input_prepared: bool = True):
+    async def generate_reference_edit(
+        request: Request,
+        user: str,
+        input_prepared: bool = True,
+        source_image: bytes | None = None,
+        source_type: str | None = None,
+    ):
         gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
         if not gemini_key:
             raise HTTPException(503, "Gemini image editing is not configured yet.")
 
-        content_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+        content_type = (source_type or request.headers.get("content-type", "")).split(";", 1)[0].strip().lower()
         if content_type not in {"image/jpeg", "image/png", "image/webp"}:
             raise HTTPException(415, "Choose a JPEG, PNG or WebP reference image.")
-        content_length = request.headers.get("content-length", "")
-        if content_length.isdigit() and int(content_length) > 10 * 1024 * 1024:
-            raise HTTPException(413, "Reference image must be 10 MB or smaller.")
-        image = await request.body()
+        if source_image is None:
+            content_length = request.headers.get("content-length", "")
+            if content_length.isdigit() and int(content_length) > 10 * 1024 * 1024:
+                raise HTTPException(413, "Reference image must be 10 MB or smaller.")
+            image = await request.body()
+        else:
+            image = source_image
         if not image or len(image) > 10 * 1024 * 1024:
             raise HTTPException(413, "Reference image must be between 1 byte and 10 MB.")
 
@@ -387,7 +401,7 @@ def create_app() -> FastAPI:
         return await generate_reference_edit(request, f"admin:{owner}", False)
 
     register_reference_routes(app, access_keys)
-    register_interview_routes(app, access_keys)
+    register_interview_routes(app, access_keys, generate_reference_edit)
     website_login.register(app, dist)
 
     if dist.is_dir():

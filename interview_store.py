@@ -24,6 +24,11 @@ from google.oauth2 import id_token as google_id_token
 from PIL import Image, ImageOps
 from starlette.concurrency import run_in_threadpool
 
+try:
+    from asyncio import timeout as async_timeout
+except ImportError:  # Python 3.10 compatibility
+    from async_timeout import timeout as async_timeout
+
 from reference_library import MAX_BYTES as MAX_REFERENCE_BYTES, validate_image
 
 MAX_PHOTO_BYTES = 10 * 1024 * 1024
@@ -185,6 +190,7 @@ class InterviewStore:
                     VALUES (?,?,?,?,?,?,?,?)""", (email, 1, 1, 1, 1, now, "system", now))
                 db.execute("""UPDATE interview_access SET workspace=1,admin=1,owner=1,active=1
                     WHERE email=?""", (email,))
+            db.commit()
             with db:
                 yield db
         except (sqlite3.Error, OSError):
@@ -279,6 +285,14 @@ class InterviewStore:
             row = db.execute("SELECT * FROM interviews WHERE id=?", (interview_id,)).fetchone()
             return self.metadata(row)
 
+    def update_photo(self, owner, interview_id, photo_name, photo_mime, photo, thumbnail):
+        with self.connection() as db:
+            if db.execute("""UPDATE interviews SET photo_name=?,photo_mime=?,photo=?,thumbnail=?
+                WHERE owner=? AND id=?""", (photo_name, photo_mime, photo, thumbnail, owner, interview_id)).rowcount == 0:
+                raise HTTPException(404, "Interview not found.")
+            row = db.execute("SELECT * FROM interviews WHERE owner=? AND id=?", (owner, interview_id)).fetchone()
+            return self.metadata(row)
+
     def delete(self, owner, interview_id):
         with self.connection() as db:
             if db.execute("DELETE FROM interviews WHERE owner=? AND id=?", (owner, interview_id)).rowcount == 0:
@@ -329,7 +343,7 @@ class InterviewStore:
             if db.execute("UPDATE interview_access SET active=0,modified=? WHERE email=?", (int(time.time()), email)).rowcount == 0:
                 raise HTTPException(404, "Access record not found.")
 
-def register_interview_routes(app, access_keys):
+def register_interview_routes(app, access_keys, image_editor=None):
     store = InterviewStore()
     requests = defaultdict(deque)
     save_lock = asyncio.Lock()
@@ -548,6 +562,49 @@ def register_interview_routes(app, access_keys):
         saved = await run_in_threadpool(access_keys.add, target_owner, candidate_name, photo, content_type)
         return {"photo": saved, "user": {"id": target_owner, "name": target_user["name"]}}
 
+    @app.get("/api/interview-admin/interviews/{interview_id}/photo")
+    async def interview_admin_photo(interview_id: str, request: Request):
+        _, interview_owner = authenticate_interview_admin(request)
+        check_id(interview_id)
+        photo, content_type, _ = await run_in_threadpool(store.photo, interview_owner, interview_id)
+        return Response(photo, media_type=content_type)
+
+    @app.post("/api/interview-admin/interviews/{interview_id}/gemini-edit")
+    async def interview_admin_gemini_edit(interview_id: str, request: Request):
+        administrator, interview_owner = authenticate_interview_admin(request)
+        check_id(interview_id)
+        if image_editor is None:
+            raise HTTPException(503, "Gemini image editing is not configured yet.")
+        photo, content_type, _ = await run_in_threadpool(store.photo, interview_owner, interview_id)
+        return await image_editor(
+            request,
+            f"interview-admin:{administrator}:{interview_id}",
+            False,
+            photo,
+            content_type,
+        )
+
+    @app.put("/api/interview-admin/interviews/{interview_id}/photo")
+    async def save_interview_admin_photo(interview_id: str, request: Request):
+        _, interview_owner = authenticate_interview_admin(request)
+        check_id(interview_id)
+        content_type = request.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
+        if content_type not in PHOTO_MIMES:
+            raise HTTPException(415, "Choose a JPEG, PNG or WebP photo.")
+        content_length = request.headers.get("Content-Length", "")
+        if content_length.isdigit() and int(content_length) > MAX_PHOTO_BYTES:
+            raise HTTPException(413, "Edited photo must be 10 MB or smaller.")
+        data = await request.body()
+        if not data or len(data) > MAX_PHOTO_BYTES:
+            raise HTTPException(413, "Edited photo must be between 1 byte and 10 MB.")
+        _, _, _, thumbnail = validate_image(data, content_type)
+        extension = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}[content_type]
+        _, _, candidate_name = await run_in_threadpool(store.photo, interview_owner, interview_id)
+        filename = f"{candidate_name[:120]} - Gemini.{extension}"
+        return await run_in_threadpool(
+            store.update_photo, interview_owner, interview_id, filename, content_type, data, thumbnail
+        )
+
     @app.get("/api/interviews")
     async def list_interviews(request: Request):
         owner = authenticate(request)
@@ -560,7 +617,7 @@ def register_interview_routes(app, access_keys):
             raise HTTPException(415, "Send interview details as JSON.")
         body = bytearray()
         try:
-            async with asyncio.timeout(45):
+            async with async_timeout(45):
                 async for chunk in request.stream():
                     if len(body) + len(chunk) > MAX_REQUEST_BYTES:
                         raise HTTPException(413, "The interview files are too large.")

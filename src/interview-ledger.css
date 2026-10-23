@@ -173,6 +173,7 @@ body[data-admin-dashboard] table { min-width: 1400px; }
 .row-actions { display: grid; gap: 6px; }
 .row-actions button { padding: 6px 8px; border: 1px solid #d1dad5; border-radius: 6px; background: #fff; color: #43534d; font-size: 9px; }
 .row-actions .edit { border-color: #bcd5cb; color: #1d684f; }
+.row-actions .gemini-edit { border-color: #b8cec6; background: #edf6f2; color: #176d48; font-weight: 780; }
 .row-actions .delete { color: #b8424f; }
 .status-badge { display: inline-flex; align-items: center; width: max-content; max-width: 100%; padding: 6px 8px; border-radius: 999px; background: #eef2f0; color: #53625d; font-size: 8px; font-weight: 850; letter-spacing: .03em; }
 .status-scheduled { background: #edf3f8; color: #3d647d; }
@@ -219,6 +220,64 @@ dialog::backdrop { background: rgba(18,43,37,.46); backdrop-filter: blur(5px); }
 .candidate-notes { margin-top: 14px; padding: 17px; border: 1px solid var(--line); border-radius: 8px; }
 .candidate-notes p { margin: 0; color: #4e5f59; font-size: 12px; line-height: 1.65; white-space: pre-wrap; }
 .candidate-panel-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 20px; }
+.gemini-photo-dialog { width: min(1180px, calc(100% - 28px)); border-radius: 20px; }
+.gemini-photo-card { max-height: calc(100vh - 28px); overflow-y: auto; border-radius: 20px; background: #f6f8f7; }
+.gemini-editor-heading { display: grid; grid-template-columns: 1fr auto auto; align-items: start; gap: 18px; padding: 24px 26px 20px; border-bottom: 1px solid #dce4e0; background: #fff; }
+.gemini-editor-title { display: flex; align-items: flex-start; gap: 14px; }
+.gemini-editor-title .kicker { margin-bottom: 7px; }
+.gemini-editor-title h2 { margin: 0 0 5px; font-size: 27px; font-weight: 720; letter-spacing: -.045em; }
+.gemini-editor-title p:last-child { margin: 0; color: #74817d; font-size: 11px; }
+.gemini-mark { display: grid; width: 42px; height: 42px; flex: 0 0 auto; place-items: center; border-radius: 12px; background: linear-gradient(145deg,#183a32,#347c67); color: #d9fff1; box-shadow: 0 8px 20px rgba(36,83,70,.18); font-size: 20px; }
+.gemini-heading-meta { display: flex; gap: 7px; padding-top: 8px; }
+.gemini-heading-meta span { padding: 6px 9px; border: 1px solid #d7e1dd; border-radius: 999px; background: #f5f8f7; color: #687771; font-size: 8px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.gemini-stepbar { display: flex; align-items: center; justify-content: center; gap: 9px; padding: 12px 26px; border-bottom: 1px solid #e0e6e3; background: #fbfcfb; color: #84908c; font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.gemini-stepbar span { display: flex; align-items: center; gap: 6px; }
+.gemini-stepbar span b { display: grid; width: 20px; height: 20px; place-items: center; border: 1px solid #ced9d4; border-radius: 50%; background: #fff; font-size: 8px; }
+.gemini-stepbar span.active { color: #216d56; }
+.gemini-stepbar span.active b { border-color: #2f8067; background: #2f8067; color: #fff; }
+.gemini-stepbar i { width: 44px; height: 1px; background: #dce3e0; }
+.gemini-workspace { display: grid; grid-template-columns: 390px minmax(0,1fr); min-height: 560px; }
+.gemini-control-panel { padding: 20px; border-right: 1px solid #dce4e0; background: #fff; }
+.gemini-control-section { padding: 17px; border: 1px solid #dce4e0; border-radius: 14px; background: #fbfcfb; }
+.gemini-control-section + .gemini-control-section { margin-top: 12px; }
+.gemini-section-heading { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 16px; }
+.gemini-section-heading > span, .gemini-preview-heading > div > span { display: grid; width: 25px; height: 25px; flex: 0 0 auto; place-items: center; border-radius: 7px; background: #e6f1ed; color: #216d56; font-size: 8px; font-weight: 900; }
+.gemini-section-heading strong { display: block; color: #25332f; font-size: 12px; }
+.gemini-section-heading small { display: block; margin-top: 3px; color: #82908a; font-size: 9px; font-weight: 500; }
+.gemini-colour-presets { display: grid; grid-template-columns: repeat(4,1fr); gap: 7px; margin-bottom: 9px; }
+.gemini-colour-presets button { display: grid; justify-items: center; gap: 5px; padding: 8px 5px 7px; border: 1px solid #d8e0dc; border-radius: 9px; background: #fff; color: #697771; font-size: 8px; font-weight: 750; }
+.gemini-colour-presets button span { width: 25px; height: 25px; border: 1px solid rgba(23,36,31,.12); border-radius: 50%; background: var(--preset); box-shadow: inset 0 0 0 3px rgba(255,255,255,.38); }
+.gemini-colour-presets button.active { border-color: #438a75; box-shadow: 0 0 0 2px #e0f0ea; color: #176d4d; }
+.gemini-colour-control { display: grid; grid-template-columns: 48px 1fr; gap: 8px; margin-bottom: 13px; }
+.gemini-colour-control input[type="color"] { height: 43px; padding: 4px; cursor: pointer; }
+.gemini-control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.gemini-control-panel label { gap: 6px; font-size: 10px; }
+.gemini-control-panel select, .gemini-control-panel input { padding: 11px 10px; font-size: 10px; }
+.gemini-safety-note { display: flex; gap: 9px; margin-top: 12px; padding: 12px 13px; border: 1px solid #cfe3da; border-radius: 11px; background: #edf7f3; color: #316a58; }
+.gemini-safety-note > span { display: grid; width: 20px; height: 20px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: #318066; color: #fff; font-size: 9px; }
+.gemini-safety-note p { margin: 0; font-size: 9px; line-height: 1.45; }
+.gemini-safety-note strong { display: block; margin-bottom: 2px; color: #215d4b; font-size: 10px; }
+.gemini-preview-panel { min-width: 0; padding: 20px; background: #f5f7f6; }
+.gemini-preview-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.gemini-preview-heading > div { display: flex; align-items: center; gap: 8px; }
+.gemini-preview-heading strong { color: #2a3833; font-size: 12px; }
+.gemini-preview-heading > small { padding: 5px 8px; border-radius: 999px; background: #e8eeeb; color: #71807a; font-size: 8px; font-weight: 750; }
+.gemini-photo-preview { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
+.gemini-photo-preview figure { min-width: 0; margin: 0; padding: 10px; border: 1px solid #d8e1dd; border-radius: 13px; background: #fff; box-shadow: 0 8px 24px rgba(34,51,44,.055); }
+.gemini-photo-preview figcaption { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.gemini-photo-preview figcaption span { color: #33443e; font-size: 9px; font-weight: 850; letter-spacing: .05em; text-transform: uppercase; }
+.gemini-photo-preview figcaption small { color: #8a9692; font-size: 8px; }
+.gemini-output-frame { border-color: #b9d5ca !important; box-shadow: 0 8px 25px rgba(42,112,88,.08) !important; }
+.gemini-image-stage { display: grid; min-height: 440px; place-items: center; overflow: hidden; border-radius: 9px; background: linear-gradient(145deg,#edf2ef,#f7f9f8); }
+.gemini-image-stage img { display: block; width: 100%; max-height: 520px; object-fit: contain; }
+.gemini-image-stage img:not([src]) { display: none; }
+.gemini-image-stage > span { display: grid; justify-items: center; gap: 10px; padding: 22px; color: #7c8984; font-size: 10px; line-height: 1.5; text-align: center; }
+.gemini-image-stage > span b { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 12px; background: #e2eee9; color: #28755d; font-size: 17px; }
+.gemini-editor-footer { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 15px 20px; border-top: 1px solid #dce4e0; background: #fff; }
+.gemini-editor-footer .dialog-actions { flex: 0 0 auto; margin: 0; }
+.gemini-photo-message { min-height: 18px; margin: 0; color: #5f6f69; font-size: 10px; }
+.gemini-generate { display: flex; align-items: center; gap: 7px; border-color: #236f58; background: linear-gradient(145deg,#1e5f4c,#2f8067); color: #fff; box-shadow: 0 7px 16px rgba(35,111,88,.16); }
+.gemini-generate span { color: #bff0df; }
 
 @media (max-width: 1100px) {
   .login-view { display: block; padding: 24px 0 48px; background: #f7f7f2; }
@@ -262,6 +321,14 @@ dialog::backdrop { background: rgba(18,43,37,.46); backdrop-filter: blur(5px); }
   .candidate-identity { align-items: flex-start; flex-direction: column; }
   .candidate-facts { grid-template-columns: 1fr; }
   .candidate-panel-actions { flex-direction: column; }
+  .gemini-workspace { grid-template-columns: 1fr; }
+  .gemini-control-panel { border-right: 0; border-bottom: 1px solid #dce4e0; }
+  .gemini-photo-preview { grid-template-columns: 1fr; }
+  .gemini-image-stage { min-height: 280px; }
+  .gemini-editor-heading { grid-template-columns: 1fr auto; }
+  .gemini-heading-meta { display: none; }
+  .gemini-editor-footer { align-items: stretch; flex-direction: column; }
+  .gemini-editor-footer .dialog-actions { flex-wrap: wrap; }
   .access-form, .access-row { grid-template-columns: 1fr; }
   .access-form .primary { grid-column: auto; }
   .access-row { gap: 8px; }

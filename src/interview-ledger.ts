@@ -41,6 +41,10 @@ let interviews: Interview[] = [];
 let managedUsers: ManagedUser[] = [];
 let accessEntries: AccessEntry[] = [];
 let editing: Interview | null = null;
+let geminiInterview: Interview | null = null;
+let geminiSourceUrl = "";
+let geminiOutputUrl = "";
+let geminiOutputBlob: Blob | null = null;
 const presetDurations = new Set([15, 30, 45, 60, 90, 120, 150, 180, 240]);
 
 const current = new Date();
@@ -138,11 +142,13 @@ function render() {
     const assignment = adminDashboard
       ? `<td><div class="assignment-control"><select class="user-assignment" aria-label="Send ${safe(item.candidateName)} photo to user"><option value="">Choose user…</option>${managedUsers.map(user => `<option value="${safe(user.id)}">${safe(user.name)}</option>`).join("")}</select><span class="assignment-status" aria-live="polite"></span></div></td>`
       : "";
-    row.innerHTML = `<td class="row-number">${index + 1}</td><td><button class="candidate-cell view" type="button"><span class="face-photo" title="${safe(item.photoName)}"><img src="${item.thumbnail}" alt="${safe(item.candidateName)} candidate photo" /></span><span><strong class="candidate-name">${safe(item.candidateName)}</strong><small>View profile</small></span></button></td><td><span class="status-badge status-${item.status.toLowerCase()}">${safe(item.status)}</span></td><td>${dateLabel(item.interviewDate)}</td><td>${timeLabel(item.startTime)}</td><td>${durationLabel(item.duration)}</td><td><div class="resume-cell"><span title="${safe(item.resumeName)}">${safe(item.resumeName)}</span><button class="download" type="button">↓ Download résumé</button></div></td>${assignment}<td><div class="row-actions"><button class="edit" type="button">Edit details</button><button class="delete" type="button">Delete</button></div></td>`;
+    const geminiAction = adminDashboard ? '<button class="gemini-edit" type="button">Gemini edit</button>' : "";
+    row.innerHTML = `<td class="row-number">${index + 1}</td><td><button class="candidate-cell view" type="button"><span class="face-photo" title="${safe(item.photoName)}"><img src="${item.thumbnail}" alt="${safe(item.candidateName)} candidate photo" /></span><span><strong class="candidate-name">${safe(item.candidateName)}</strong><small>View profile</small></span></button></td><td><span class="status-badge status-${item.status.toLowerCase()}">${safe(item.status)}</span></td><td>${dateLabel(item.interviewDate)}</td><td>${timeLabel(item.startTime)}</td><td>${durationLabel(item.duration)}</td><td><div class="resume-cell"><span title="${safe(item.resumeName)}">${safe(item.resumeName)}</span><button class="download" type="button">↓ Download résumé</button></div></td>${assignment}<td><div class="row-actions">${geminiAction}<button class="edit" type="button">Edit details</button><button class="delete" type="button">Delete</button></div></td>`;
     row.querySelector<HTMLButtonElement>(".view")!.onclick = () => openCandidate(item);
     row.querySelector<HTMLButtonElement>(".download")!.onclick = () => downloadResume(item);
     row.querySelector<HTMLButtonElement>(".edit")!.onclick = () => openDialog(item);
     row.querySelector<HTMLButtonElement>(".delete")!.onclick = () => removeInterview(item);
+    row.querySelector<HTMLButtonElement>(".gemini-edit")?.addEventListener("click", () => { void openGeminiPhotoEditor(item); });
     const userAssignment = row.querySelector<HTMLSelectElement>(".user-assignment");
     if (userAssignment) userAssignment.onchange = () => sendPhotoToUser(item, userAssignment);
     rows.append(row);
@@ -262,6 +268,102 @@ async function sendPhotoToUser(item: Interview, select: HTMLSelectElement) {
   } finally {
     select.disabled = false;
   }
+}
+
+function clearGeminiPhotoEditor() {
+  if (geminiSourceUrl) URL.revokeObjectURL(geminiSourceUrl);
+  if (geminiOutputUrl) URL.revokeObjectURL(geminiOutputUrl);
+  geminiSourceUrl = "";
+  geminiOutputUrl = "";
+  geminiOutputBlob = null;
+  get<HTMLImageElement>("geminiPhotoOriginal").removeAttribute("src");
+  get<HTMLImageElement>("geminiPhotoOutput").removeAttribute("src");
+  get("geminiPhotoPlaceholder").hidden = false;
+  get<HTMLButtonElement>("saveGeminiPhotoButton").hidden = true;
+}
+
+async function openGeminiPhotoEditor(item: Interview) {
+  geminiInterview = item;
+  clearGeminiPhotoEditor();
+  get("geminiCandidateLabel").textContent = `Edit ${item.candidateName}'s shirt, colour and framing before sharing the photo.`;
+  get("geminiPhotoMessage").textContent = "Loading original candidate photo…";
+  const generate = get<HTMLButtonElement>("generateGeminiPhotoButton");
+  generate.disabled = true;
+  get<HTMLDialogElement>("geminiPhotoDialog").showModal();
+  try {
+    const response = await request(`/api/interview-admin/interviews/${encodeURIComponent(item.id)}/photo`);
+    if (geminiInterview?.id !== item.id) return;
+    const source = await response.blob();
+    geminiSourceUrl = URL.createObjectURL(source);
+    get<HTMLImageElement>("geminiPhotoOriginal").src = geminiSourceUrl;
+    get("geminiPhotoMessage").textContent = "Original photo ready. Choose the settings and generate.";
+    generate.disabled = false;
+  } catch (error) {
+    get("geminiPhotoMessage").textContent = error instanceof Error ? error.message : "Candidate photo could not be loaded.";
+  }
+}
+
+async function generateGeminiPhoto() {
+  const item = geminiInterview;
+  if (!item) return;
+  const colour = get<HTMLInputElement>("geminiPhotoColour").value.trim();
+  if (!colour) {
+    get("geminiPhotoMessage").textContent = "Enter a shirt colour.";
+    return;
+  }
+  const generate = get<HTMLButtonElement>("generateGeminiPhotoButton");
+  const saveButton = get<HTMLButtonElement>("saveGeminiPhotoButton");
+  generate.disabled = true;
+  saveButton.hidden = true;
+  get("geminiPhotoMessage").textContent = "Gemini is editing the clothing. Please wait…";
+  const query = new URLSearchParams({
+    color: colour,
+    mode: get<HTMLSelectElement>("geminiPhotoMode").value,
+    wrinkles: get<HTMLSelectElement>("geminiPhotoWrinkles").value,
+    framing: get<HTMLSelectElement>("geminiPhotoFraming").value,
+    aspect_ratio: get<HTMLSelectElement>("geminiPhotoRatio").value,
+  });
+  try {
+    const response = await request(`/api/interview-admin/interviews/${encodeURIComponent(item.id)}/gemini-edit?${query}`, { method: "POST" });
+    if (geminiInterview?.id !== item.id) return;
+    geminiOutputBlob = await response.blob();
+    if (geminiOutputUrl) URL.revokeObjectURL(geminiOutputUrl);
+    geminiOutputUrl = URL.createObjectURL(geminiOutputBlob);
+    get<HTMLImageElement>("geminiPhotoOutput").src = geminiOutputUrl;
+    get("geminiPhotoPlaceholder").hidden = true;
+    saveButton.hidden = false;
+    get("geminiPhotoMessage").textContent = "Gemini edit ready. Review it, then save it as the candidate photo.";
+  } catch (error) {
+    get("geminiPhotoMessage").textContent = error instanceof Error ? error.message : "Gemini image editing failed.";
+  } finally {
+    if (geminiInterview?.id === item.id) generate.disabled = false;
+  }
+}
+
+async function saveGeminiPhoto() {
+  const item = geminiInterview;
+  if (!item || !geminiOutputBlob) return;
+  const saveButton = get<HTMLButtonElement>("saveGeminiPhotoButton");
+  saveButton.disabled = true;
+  get("geminiPhotoMessage").textContent = "Saving edited candidate photo…";
+  try {
+    await request(`/api/interview-admin/interviews/${encodeURIComponent(item.id)}/photo`, {
+      method: "PUT",
+      headers: { "Content-Type": geminiOutputBlob.type || "image/png" },
+      body: geminiOutputBlob,
+    });
+    get<HTMLDialogElement>("geminiPhotoDialog").close();
+    await load();
+    sheetMessage.textContent = `${item.candidateName}'s Gemini-edited photo is now saved and ready to share.`;
+  } catch (error) {
+    get("geminiPhotoMessage").textContent = error instanceof Error ? error.message : "Edited photo could not be saved.";
+  } finally { saveButton.disabled = false; }
+}
+
+function closeGeminiPhotoEditor() {
+  get<HTMLDialogElement>("geminiPhotoDialog").close();
+  geminiInterview = null;
+  clearGeminiPhotoEditor();
 }
 
 function openDialog(item: Interview | null = null) {
@@ -433,5 +535,24 @@ if (adminDashboard) {
   };
   get<HTMLButtonElement>("closeAccessButton").onclick = () => { get<HTMLDialogElement>("accessDialog").close(); };
   get<HTMLFormElement>("accessForm").addEventListener("submit", saveAccess);
+  get<HTMLButtonElement>("closeGeminiPhotoButton").onclick = closeGeminiPhotoEditor;
+  get<HTMLButtonElement>("cancelGeminiPhotoButton").onclick = closeGeminiPhotoEditor;
+  get<HTMLButtonElement>("generateGeminiPhotoButton").onclick = () => { void generateGeminiPhoto(); };
+  get<HTMLButtonElement>("saveGeminiPhotoButton").onclick = () => { void saveGeminiPhoto(); };
+  get<HTMLInputElement>("geminiPhotoColourPicker").oninput = event => {
+    const value = (event.target as HTMLInputElement).value;
+    get<HTMLInputElement>("geminiPhotoColour").value = `${value} custom colour`;
+    document.querySelectorAll("[data-gemini-colour]").forEach(button => button.classList.remove("active"));
+  };
+  document.querySelectorAll<HTMLButtonElement>("[data-gemini-colour]").forEach(button => {
+    button.onclick = () => {
+      document.querySelectorAll("[data-gemini-colour]").forEach(option => option.classList.toggle("active", option === button));
+      get<HTMLInputElement>("geminiPhotoColourPicker").value = button.dataset.geminiColour || "#efb4be";
+      get<HTMLInputElement>("geminiPhotoColour").value = button.dataset.geminiName || "soft blush pink";
+    };
+  });
+  get<HTMLSelectElement>("geminiPhotoFraming").onchange = event => {
+    get<HTMLLabelElement>("geminiPhotoRatioLabel").hidden = (event.target as HTMLSelectElement).value !== "auto";
+  };
 }
 void setupGoogleSignIn();
