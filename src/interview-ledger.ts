@@ -1,4 +1,5 @@
 import "./interview-ledger.css";
+import "./interview-users.css";
 
 type InterviewStatus = "Scheduled" | "Completed" | "Selected" | "Rejected" | "Cancelled";
 type Interview = { id: string; candidateName: string; interviewDate: string; startTime: string; duration: number; photoName: string; resumeName: string; createdAt: number; thumbnail: string; status: InterviewStatus; notes: string; rating: number };
@@ -554,6 +555,9 @@ durationInput.onchange = () => {
 };
 form.addEventListener("submit", save);
 if (adminDashboard) {
+  const usersDialog = get<HTMLDialogElement>("usersDialog");
+  get<HTMLButtonElement>("usersButton").onclick = () => { usersDialog.showModal(); };
+  get<HTMLButtonElement>("closeUsersButton").onclick = () => { usersDialog.close(); };
   get<HTMLButtonElement>("manageAccessButton").onclick = () => {
     get<HTMLDialogElement>("accessDialog").showModal();
   };
