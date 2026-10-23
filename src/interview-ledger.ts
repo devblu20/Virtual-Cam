@@ -1,5 +1,6 @@
 import "./interview-ledger.css";
 import "./interview-users.css";
+import "./interview-users.js";
 
 type InterviewStatus = "Scheduled" | "Completed" | "Selected" | "Rejected" | "Cancelled";
 type Interview = { id: string; candidateName: string; interviewDate: string; startTime: string; duration: number; photoName: string; resumeName: string; createdAt: number; thumbnail: string; status: InterviewStatus; notes: string; rating: number };
@@ -585,3 +586,4 @@ if (adminDashboard) {
 }
 void setupGoogleSignIn();
 void restoreWorkspace();
+

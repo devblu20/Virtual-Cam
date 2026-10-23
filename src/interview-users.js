@@ -1,5 +1,6 @@
 (() => {
  'use strict';
+ if(!document.getElementById('usersDialog'))return;
  const $=id=>document.getElementById(id); let key='',data=null,current=null,busy=false,generation=0,photoGeneration=0,controller=null,geminiBlob=null,geminiOwner='',geminiSourceUrl='',geminiOutputUrl='';const photoUrls=new Set();
  const message=text=>{$('message').textContent=text;};
  async function api(path,method='GET',body){
@@ -53,4 +54,5 @@
  $('defaults').onsubmit=e=>{e.preventDefault();void action(async own=>{await api('default-prompt','PUT',{revision:data.default.revision,prompt:$('defaultPrompt').value});await load(own);message('Default saved for the next 0.4.1 sessions.');});};
  $('userList').onchange=()=>select($('userList').value);$('custom').onchange=counts;$('prompt').oninput=counts;$('defaultPrompt').oninput=counts;window.addEventListener('pagehide',lock);
 })();
+
 
