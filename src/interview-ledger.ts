@@ -63,6 +63,17 @@ async function openWorkspace(nextCredentials: string) {
   credentials = nextCredentials;
   message.textContent = "Opening workspace…";
   try {
+    const panel = adminDashboard ? "admin" : "workspace";
+    const session = await fetch(`/api/interview-session?panel=${panel}`, {
+      method: "POST",
+      headers: { Authorization: credentials },
+    });
+    if (!session.ok) {
+      let detail = "Login failed.";
+      try { detail = (await session.json()).detail || detail; } catch { /* Safe fallback. */ }
+      throw new Error(detail);
+    }
+    credentials = "";
     await load();
     loginView.hidden = true;
     ledgerView.hidden = false;
@@ -71,6 +82,17 @@ async function openWorkspace(nextCredentials: string) {
     credentials = "";
     message.textContent = error instanceof Error ? error.message : "Login failed.";
   }
+}
+
+async function restoreWorkspace() {
+  const panel = adminDashboard ? "admin" : "workspace";
+  try {
+    const response = await fetch(`/api/interview-session?panel=${panel}`, { cache: "no-store" });
+    if (!response.ok) return;
+    await load();
+    loginView.hidden = true;
+    ledgerView.hidden = false;
+  } catch { /* Keep the sign-in view available. */ }
 }
 
 async function setupGoogleSignIn() {
@@ -498,7 +520,8 @@ get<HTMLFormElement>("loginForm").onsubmit = async event => {
   const password = get<HTMLInputElement>("portalPassword").value;
   await openWorkspace(basic(id, password));
 };
-get("logoutButton").onclick = () => {
+get("logoutButton").onclick = async () => {
+  try { await fetch("/api/interview-session/logout", { method: "POST" }); } catch { /* Clear the local view regardless. */ }
   credentials = ""; interviews = []; accessEntries = []; window.google?.accounts.id.disableAutoSelect();
   ledgerView.hidden = true; loginView.hidden = false; get<HTMLInputElement>("portalPassword").value = "";
   const accessDialog = document.getElementById("accessDialog") as HTMLDialogElement | null;
@@ -556,3 +579,4 @@ if (adminDashboard) {
   };
 }
 void setupGoogleSignIn();
+void restoreWorkspace();

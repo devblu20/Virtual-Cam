@@ -7,6 +7,7 @@ import io
 import json
 import os
 import re
+import secrets
 import sqlite3
 import time
 import uuid
@@ -18,7 +19,7 @@ from pathlib import Path
 from xml.sax.saxutils import escape
 
 from fastapi import HTTPException, Request
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from google.auth.transport.requests import Request as GoogleRequest
 from google.oauth2 import id_token as google_id_token
 from PIL import Image, ImageOps
@@ -347,6 +348,23 @@ def register_interview_routes(app, access_keys, image_editor=None):
     store = InterviewStore()
     requests = defaultdict(deque)
     save_lock = asyncio.Lock()
+    session_cookie = "interview_session"
+    session_seconds = 7 * 24 * 60 * 60
+    sessions = {}
+
+    def session_identity(request, panel):
+        token = request.cookies.get(session_cookie, "")
+        digest = hashlib.sha256(token.encode()).hexdigest()
+        session = sessions.get(digest)
+        if not session:
+            return None
+        expires, saved_panel, administrator, owner = session
+        if expires <= time.time():
+            sessions.pop(digest, None)
+            return None
+        if saved_panel != panel:
+            return None
+        return administrator, owner
 
     def google_email(request):
         authorization = request.headers.get("Authorization", "")
@@ -379,6 +397,9 @@ def register_interview_routes(app, access_keys, image_editor=None):
         return {"clientId": client_id if len(client_id) <= 256 else ""}
 
     def authenticate_interview_admin(request):
+        active_session = session_identity(request, "admin")
+        if active_session:
+            return active_session
         email = google_email(request)
         if email:
             if not store.access_allowed(email, "admin"):
@@ -401,6 +422,9 @@ def register_interview_routes(app, access_keys, image_editor=None):
         return email, portal_owner()
 
     def authenticate(request):
+        active_session = session_identity(request, "workspace")
+        if active_session:
+            return active_session[1]
         email = google_email(request)
         if email:
             if not store.access_allowed(email, "workspace"):
@@ -455,6 +479,48 @@ def register_interview_routes(app, access_keys, image_editor=None):
             raise HTTPException(429, "Too many interview requests. Try again in a minute.")
         bucket.append(now)
         return owner
+
+    @app.post("/api/interview-session")
+    async def create_interview_session(request: Request):
+        panel = request.query_params.get("panel", "workspace")
+        if panel == "admin":
+            administrator, owner = authenticate_interview_admin(request)
+        elif panel == "workspace":
+            owner = authenticate(request)
+            administrator = ""
+        else:
+            raise HTTPException(400, "Choose a valid interview panel.")
+        now = time.time()
+        for key, value in list(sessions.items()):
+            if value[0] <= now:
+                sessions.pop(key, None)
+        if len(sessions) >= 500:
+            raise HTTPException(429, "Too many active interview sessions. Try again later.")
+        token = secrets.token_urlsafe(32)
+        sessions[hashlib.sha256(token.encode()).hexdigest()] = (
+            now + session_seconds, panel, administrator, owner)
+        response = JSONResponse({"ok": True})
+        forwarded = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip()
+        response.set_cookie(session_cookie, token, max_age=session_seconds, httponly=True,
+                            secure=request.url.scheme == "https" or forwarded == "https",
+                            samesite="strict", path="/")
+        return response
+
+    @app.get("/api/interview-session")
+    async def restore_interview_session(request: Request):
+        panel = request.query_params.get("panel", "workspace")
+        active_session = session_identity(request, panel)
+        if not active_session:
+            raise HTTPException(401, "Sign in to continue.")
+        return {"ok": True}
+
+    @app.post("/api/interview-session/logout")
+    async def close_interview_session(request: Request):
+        token = request.cookies.get(session_cookie, "")
+        sessions.pop(hashlib.sha256(token.encode()).hexdigest(), None)
+        response = JSONResponse({"ok": True})
+        response.delete_cookie(session_cookie, path="/")
+        return response
 
     def check_id(interview_id):
         if not re.fullmatch(r"[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}", interview_id):
