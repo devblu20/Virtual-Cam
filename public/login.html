@@ -1,5 +1,21 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="dark"><title>Sign in | Bluqq Virtual CAM</title><link rel="stylesheet" href="/login.css"><script src="/login.js" defer></script></head>
-<body><main class="login-card"><span class="brand" aria-hidden="true">b.</span><p class="eyebrow">BLUQQ CAMERA STUDIO</p><h1>Welcome back.</h1><p class="intro">Sign in to your Virtual CAM studio.</p><form id="loginForm"><label for="username">Bluqq Workspace ID</label><input id="username" name="username" autocomplete="username" maxlength="80" required autofocus><label for="password">Bluqq Virtual CAM password</label><input id="password" name="password" type="password" autocomplete="current-password" maxlength="256" required><button id="signIn" type="submit">Sign in</button><p id="message" role="status" aria-live="polite"></p></form><p class="footer">Virtual CAM — A product by <strong>Bluqq</strong></p></main></body>
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="dark">
+  <title>Sign in | Bluqq Virtual CAM</title><link rel="stylesheet" href="/login.css"><script src="/login.js" defer></script>
+</head>
+<body>
+  <main class="login-card">
+    <span class="brand" aria-hidden="true">b.</span><p class="eyebrow">BLUQQ CAMERA STUDIO</p><h1>Welcome back.</h1>
+    <p class="intro">Sign in to the private Bluqq Virtual CAM studio using credentials issued directly by Bluqq.</p>
+    <aside class="credential-notice" aria-label="Credential safety notice"><strong>Use only your Bluqq Virtual CAM credentials.</strong>Never enter your Google, email, banking, or any other account password on this page.</aside>
+    <form id="loginForm" autocomplete="off">
+      <label for="username">Bluqq Workspace ID</label><input id="username" name="username" autocomplete="off" maxlength="80" required autofocus>
+      <label for="password">Bluqq Virtual CAM password</label><input id="password" name="password" type="password" autocomplete="off" maxlength="256" required>
+      <button id="signIn" type="submit">Open Bluqq Virtual CAM</button><p id="message" role="status" aria-live="polite"></p>
+    </form>
+    <p class="hosting-note">This private application is operated by Bluqq and hosted on Railway.</p>
+    <footer class="footer"><span>Virtual CAM — A product by <strong>Bluqq</strong></span><nav aria-label="Application information"><a href="https://www.bluqq.com/" target="_blank" rel="noopener noreferrer">Official website</a><a href="/privacy.html">Privacy policy</a><a href="mailto:devblu.work@gmail.com">Support</a></nav></footer>
+  </main>
+</body>
 </html>
