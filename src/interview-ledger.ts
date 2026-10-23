@@ -64,7 +64,7 @@ async function openWorkspace(nextCredentials: string) {
   message.textContent = "Opening workspace…";
   try {
     const panel = adminDashboard ? "admin" : "workspace";
-    const session = await fetch(`/api/interview-session?panel=${panel}`, {
+    const session = await fetch(`/api/interview-admin/session?panel=${panel}`, {
       method: "POST",
       headers: { Authorization: credentials },
     });
@@ -87,7 +87,7 @@ async function openWorkspace(nextCredentials: string) {
 async function restoreWorkspace() {
   const panel = adminDashboard ? "admin" : "workspace";
   try {
-    const response = await fetch(`/api/interview-session?panel=${panel}`, { cache: "no-store" });
+    const response = await fetch(`/api/interview-admin/session?panel=${panel}`, { cache: "no-store" });
     if (!response.ok) return;
     await load();
     loginView.hidden = true;
@@ -521,7 +521,7 @@ get<HTMLFormElement>("loginForm").onsubmit = async event => {
   await openWorkspace(basic(id, password));
 };
 get("logoutButton").onclick = async () => {
-  try { await fetch("/api/interview-session/logout", { method: "POST" }); } catch { /* Clear the local view regardless. */ }
+  try { await fetch("/api/interview-admin/session/logout", { method: "POST" }); } catch { /* Clear the local view regardless. */ }
   credentials = ""; interviews = []; accessEntries = []; window.google?.accounts.id.disableAutoSelect();
   ledgerView.hidden = true; loginView.hidden = false; get<HTMLInputElement>("portalPassword").value = "";
   const accessDialog = document.getElementById("accessDialog") as HTMLDialogElement | null;

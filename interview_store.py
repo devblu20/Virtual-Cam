@@ -480,7 +480,7 @@ def register_interview_routes(app, access_keys, image_editor=None):
         bucket.append(now)
         return owner
 
-    @app.post("/api/interview-session")
+    @app.post("/api/interview-admin/session")
     async def create_interview_session(request: Request):
         panel = request.query_params.get("panel", "workspace")
         if panel == "admin":
@@ -506,7 +506,7 @@ def register_interview_routes(app, access_keys, image_editor=None):
                             samesite="strict", path="/")
         return response
 
-    @app.get("/api/interview-session")
+    @app.get("/api/interview-admin/session")
     async def restore_interview_session(request: Request):
         panel = request.query_params.get("panel", "workspace")
         active_session = session_identity(request, panel)
@@ -514,7 +514,7 @@ def register_interview_routes(app, access_keys, image_editor=None):
             raise HTTPException(401, "Sign in to continue.")
         return {"ok": True}
 
-    @app.post("/api/interview-session/logout")
+    @app.post("/api/interview-admin/session/logout")
     async def close_interview_session(request: Request):
         token = request.cookies.get(session_cookie, "")
         sessions.pop(hashlib.sha256(token.encode()).hexdigest(), None)
