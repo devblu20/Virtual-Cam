@@ -35,9 +35,15 @@
         <div class="login-card">
           <p class="kicker">ADMIN ACCESS</p>
           <h1>Welcome back.</h1>
-          <p class="login-copy">Continue with an approved Bluqq Google account.</p>
-          <p class="message" id="loginMessage" aria-live="polite"></p>
+          <p class="login-copy">Use your approved administrator email and password to continue.</p>
+          <form id="loginForm">
+            <label>Email address<input id="portalId" type="email" autocomplete="username" placeholder="Enter approved email" required /></label>
+            <label>Password<input id="portalPassword" type="password" autocomplete="current-password" placeholder="Enter password" required /></label>
+            <button class="primary wide" type="submit">Open Admin Dashboard <span>→</span></button>
+            <p class="message" id="loginMessage" aria-live="polite"></p>
+          </form>
           <div class="google-login" id="googleLogin" hidden>
+            <div class="login-divider"><span>or</span></div>
             <div class="google-signin" id="googleSignIn"></div>
           </div>
           <p class="security-note">Only approved administrator emails can open this dashboard.</p>

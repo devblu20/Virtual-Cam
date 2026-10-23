@@ -51,6 +51,13 @@ const current = new Date();
 const today = new Date(current.getTime() - current.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 dateInput.min = today;
 
+function basic(id: string, password: string) {
+  const bytes = new TextEncoder().encode(`${id}:${password}`);
+  let binary = "";
+  bytes.forEach(byte => binary += String.fromCharCode(byte));
+  return `Basic ${btoa(binary)}`;
+}
+
 async function openWorkspace(nextCredentials: string) {
   const message = get("loginMessage");
   credentials = nextCredentials;
@@ -92,9 +99,7 @@ async function setupGoogleSignIn() {
       shape: "rectangular", logo_alignment: "left", width: 340,
     });
     container.hidden = false;
-  } catch {
-    get("loginMessage").textContent = "Google sign-in is temporarily unavailable. Please try again shortly.";
-  }
+  } catch { /* Keep the existing password login available if Google is unavailable. */ }
 }
 
 async function request(path: string, options: RequestInit = {}) {
@@ -487,9 +492,15 @@ async function downloadExcel() {
   } catch (error) { sheetMessage.textContent = error instanceof Error ? error.message : "Excel export failed."; }
 }
 
+get<HTMLFormElement>("loginForm").onsubmit = async event => {
+  event.preventDefault();
+  const id = get<HTMLInputElement>("portalId").value.trim();
+  const password = get<HTMLInputElement>("portalPassword").value;
+  await openWorkspace(basic(id, password));
+};
 get("logoutButton").onclick = () => {
   credentials = ""; interviews = []; accessEntries = []; window.google?.accounts.id.disableAutoSelect();
-  ledgerView.hidden = true; loginView.hidden = false;
+  ledgerView.hidden = true; loginView.hidden = false; get<HTMLInputElement>("portalPassword").value = "";
   const accessDialog = document.getElementById("accessDialog") as HTMLDialogElement | null;
   if (accessDialog?.open) accessDialog.close();
 };
