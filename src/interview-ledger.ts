@@ -93,6 +93,7 @@ async function restoreWorkspace() {
     loginView.hidden = true;
     ledgerView.hidden = false;
   } catch { /* Keep the sign-in view available. */ }
+  finally { document.body.classList.remove("auth-checking"); }
 }
 
 async function setupGoogleSignIn() {

@@ -2,6 +2,7 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 body { margin: 0; min-width: 320px; min-height: 100vh; background: #f6f7f5; }
+.auth-checking .login-view { visibility: hidden; }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 3px solid #99c8b9; outline-offset: 2px; }
