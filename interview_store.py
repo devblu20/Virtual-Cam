@@ -422,7 +422,7 @@ def register_interview_routes(app, access_keys, image_editor=None):
         return email, portal_owner()
 
     def authenticate(request):
-        active_session = session_identity(request, "workspace")
+        active_session = session_identity(request, "workspace") or session_identity(request, "admin")
         if active_session:
             return active_session[1]
         email = google_email(request)
