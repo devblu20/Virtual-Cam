@@ -54,7 +54,7 @@ class ManagedUsers(ReferenceStore):
         return dict(json.loads(row['settings']), revision=row['revision']) if row else dict(model='lucy-2.5', enhance=True, selfAnchor=True, revision=0)
 
     def save_runtime(self, body):
-        if body.get('model') not in ('lucy-2.1', 'lucy-2.5') or type(body.get('enhance')) is not bool or type(body.get('selfAnchor')) is not bool or type(body.get('revision')) is not int:
+        if body.get('model') not in ('lucy-2.1', 'lucy-2.5', 'lucy-2.6') or type(body.get('enhance')) is not bool or type(body.get('selfAnchor')) is not bool or type(body.get('revision')) is not int:
             raise HTTPException(400, 'Choose a supported model and valid settings.')
         self.runtime()
         with self.connection() as db:

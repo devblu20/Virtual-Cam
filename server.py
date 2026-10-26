@@ -256,7 +256,7 @@ def create_app() -> FastAPI:
                 async with DecartClient(api_key=api_key) as client:
                     token = await client.tokens.create(
                         expires_in=120,
-                        allowed_models=["lucy-2.1", "lucy-2.5"],
+                        allowed_models=["lucy-2.1", "lucy-2.5", "lucy-2.6"],
                         metadata={"app": "virtualcam-cloud"},
                     )
             result = {"apiKey": token.api_key}

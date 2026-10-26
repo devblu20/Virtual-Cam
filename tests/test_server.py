@@ -60,7 +60,7 @@ class CloudTests(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json(), {"apiKey": "temporary-test-token"})
         self.create_token.assert_awaited_once_with(
-            expires_in=120, allowed_models=["lucy-2.1", "lucy-2.5"],
+            expires_in=120, allowed_models=["lucy-2.1", "lucy-2.5", "lucy-2.6"],
             metadata={"app": "virtualcam-cloud"},
         )
 

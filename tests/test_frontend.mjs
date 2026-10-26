@@ -598,14 +598,14 @@ test("video and reference previews keep the full frame rather than cropping hair
 });
 
 test("Railway controls website model, enhancement and self anchoring", async () => {
- for (const model of ['lucy-2.1','lucy-2.5']) {
+ for (const model of ['lucy-2.1','lucy-2.5','lucy-2.6']) {
   const h=harness();
   try {
    h.hooks.fetch=async()=>({ok:true,json:async()=>({apiKey:'test',processingConfig:{...processingConfig,model,enhance:false,selfAnchor:false}})});
    await h.click('cameraButton');await h.click('connectButton');
    const options=h.calls.decart[0][1];
    assert.equal(options.model.name,model);assert.equal(options.initialState.prompt.enhance,false);
-   assert.equal(options.queryParams.self_anchor,model==='lucy-2.5'?'false':undefined);
+   assert.equal(options.queryParams.self_anchor,model!=='lucy-2.1'?'false':undefined);
    await h.click('updateButton');assert.equal(h.calls.updates[0].enhance,false);
   } finally {h.cleanup();}
  }

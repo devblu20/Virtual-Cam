@@ -13,7 +13,7 @@ function processingConfig(value: unknown): ProcessingConfig {
       !config.prompt.trim() || config.prompt.length > 1024 ||
       typeof config.userId !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(config.userId) ||
       typeof config.displayName !== "string" || config.displayName.length > 80 ||
-      !["lucy-2.1", "lucy-2.5"].includes(config.model || "") || typeof config.enhance !== "boolean" || typeof config.selfAnchor !== "boolean" ||
+      !["lucy-2.1", "lucy-2.5", "lucy-2.6"].includes(config.model || "") || typeof config.enhance !== "boolean" || typeof config.selfAnchor !== "boolean" ||
       typeof config.revision !== "string" || !/^[a-f0-9]{64}$/.test(config.revision)) {
     throw new Error("Railway did not provide a valid processing prompt. Deploy the updated backend, then reconnect.");
   }
@@ -83,7 +83,7 @@ let diagnosticToken = "";
 let loadedDefaultPrompt = "";
 
 function model() {
-  return models.realtime(sessionConfig?.model === "lucy-2.1" ? "lucy-2.1" : "lucy-2.5");
+  return models.realtime(sessionConfig?.model === "lucy-2.6" ? "lucy-2.6" : sessionConfig?.model === "lucy-2.1" ? "lucy-2.1" : "lucy-2.5");
 }
 function syncReferenceState() {
   referenceState.textContent = checkingReference ? "Checking image locally…"
@@ -470,7 +470,7 @@ function updateOutputDetails() {
   const target = model();
   const belowTarget = !!(width && height && width * height < target.width * target.height);
   outputDetails.textContent = width && height
-    ? `Received: ${width} × ${height} · ${sessionConfig?.model === "lucy-2.1" ? "Lucy 2.1" : "Lucy 2.5"}${belowTarget ? " — lower pixel count than the model input; inspect output detail." : ""}`
+    ? `Received: ${width} × ${height} · ${sessionConfig?.model === "lucy-2.6" ? "Lucy 2.6" : sessionConfig?.model === "lucy-2.1" ? "Lucy 2.1" : "Lucy 2.5"}${belowTarget ? " — lower pixel count than the model input; inspect output detail." : ""}`
     : "Output: provider default, matching the extension · Waiting for decoded video dimensions…";
   outputDetails.dataset.tone = belowTarget ? "warning" : "idle";
 }
@@ -797,7 +797,7 @@ async function connect() {
     });
     const connected = await client.realtime.connect(camera, {
       model: model(),
-      queryParams: token.config.model === "lucy-2.5" ? { self_anchor: String(token.config.selfAnchor) } : {},
+      queryParams: token.config.model !== "lucy-2.1" ? { self_anchor: String(token.config.selfAnchor) } : {},
       mirror: false,
       // No resolution override: use the same provider default as the ZIP.
       initialState: { prompt: { text: effectivePrompt, enhance: token.config.enhance }, image: reference },

@@ -9,7 +9,7 @@
     "test": "node --test tests/test_frontend.mjs"
   },
   "dependencies": {
-    "@decartai/sdk": "0.1.22",
+    "@decartai/sdk": "0.2.14",
     "@mediapipe/tasks-vision": "^1.1.0"
   },
   "devDependencies": {

@@ -76,6 +76,20 @@ class ManagedTests(unittest.TestCase):
         self.assertNotEqual(self.config(b['accessKey']).json()['prompt'], config['prompt'])
         self.assertEqual(self.client.get('/api/references', headers=auth(a['accessKey'])).status_code, 200)
 
+    def test_lucy_26_runtime_reaches_token_without_changing_legacy(self):
+        user = self.create()
+        settings = dict(model='lucy-2.6', enhance=True, selfAnchor=True, revision=0)
+        saved = self.client.put('/api/admin/runtime', headers=auth(ADMIN), json=settings)
+        self.assertEqual(saved.status_code, 200, saved.text)
+        config = self.client.get('/api/client-config?version=3', headers=auth(user['accessKey'])).json()
+        self.assertEqual(config['model'], 'lucy-2.6')
+        self.assertTrue(config['selfAnchor'])
+        token = self.client.post('/api/realtime-token', headers=auth(user['accessKey']), json={'processingConfigVersion': 3})
+        self.assertEqual(token.status_code, 200, token.text)
+        self.assertEqual(token.json()['processingConfig'], config)
+        self.assertIn('lucy-2.6', self.mint.call_args.kwargs['allowed_models'])
+        self.assertEqual(self.config(user['accessKey']).json()['model'], 'lucy-2.1')
+
     def test_rotation_revocation_persistence_and_revision_conflict(self):
         a = self.create(); user = a['user']
         updated = self.save(user, prompt='Natural hair.').json()['user']
