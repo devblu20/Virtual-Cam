@@ -509,7 +509,12 @@ def register_interview_routes(app, access_keys, image_editor=None):
     @app.get("/api/interview-admin/session")
     async def restore_interview_session(request: Request):
         panel = request.query_params.get("panel", "workspace")
-        active_session = session_identity(request, panel)
+        if panel == "workspace":
+            active_session = session_identity(request, "workspace") or session_identity(request, "admin")
+        elif panel == "admin":
+            active_session = session_identity(request, "admin")
+        else:
+            raise HTTPException(400, "Choose a valid interview panel.")
         if not active_session:
             raise HTTPException(401, "Sign in to continue.")
         return {"ok": True}
