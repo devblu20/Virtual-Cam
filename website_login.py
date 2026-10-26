@@ -89,22 +89,8 @@ class WebsiteLogin:
                 return JSONResponse({"detail": "Run npm ci and npm run build first."}, status_code=503)
             page = (dist / "index.html").read_text(encoding="utf-8")
             if self.enabled:
-                page = page.replace('id="personalAccessField"', 'id="personalAccessField" hidden')
-                page = page.replace('id="accessKey"', f'id="accessKey" value="{SESSION_MARKER}"')
                 menu = '<form id="websiteLogout" action="/api/website-logout" method="post"><span>Signed in as ' + html.escape(self.username) + '</span> <button type="submit">Sign out</button></form>'
                 page = page.replace("<!-- ACCOUNT_MENU -->", menu)
-                page = page.replace("Enter your personal key above, then refresh to see your saved photos.", "Press Refresh photos to see this account’s saved photos.")
-                for old, new in {
-                    "Your extension photo library": "Your photo library",
-                    "Upload once. Choose it in your extension whenever you need it.": "Save reference photos in your signed-in account.",
-                    "It will appear in the extension using the same personal access key.": "It will be saved to this website account’s private library.",
-                    "everyone using this personal access key": "everyone using this website login",
-                    "Save to extension": "Save photo",
-                    "Load this key's library": "Load this account’s library",
-                    "No new extension ZIP is needed for photo changes.": "Saved photos stay with this website account.",
-                    "Anyone sharing the same key": "Anyone sharing this website login",
-                }.items():
-                    page = page.replace(old, new)
             return HTMLResponse(page)
 
         @app.post("/api/website-login")

@@ -11,12 +11,13 @@ Never commit this file or put the password in frontend JavaScript.
 
 The website uses an HttpOnly session cookie valid for eight hours. Signing out
 revokes the session; a service restart signs everyone out. Failed login attempts
-are limited. Run one worker/replica as specified below. Signed-in website users
-do not need a personal access key. Existing extension bearer keys still work,
+are limited. Run one worker/replica as specified below. Signed-in website users enter the personal access key of the user they want
+to test. That key selects the assigned prompt and private photo library. It is
+not saved in browser storage. Existing extension bearer keys still work,
 and administrator/Interview Ledger credentials remain independent.
 
-The website login has its own stable account ID, visible in user management.
-Its photo library is separate from existing extension users. Configure a writable
+The older website-account identity and saved photos remain stored; the studio
+now uses the entered personal key instead of silently selecting that account. Configure a writable
 Railway volume and `VCAM_DATA_DIR` as described in `PHOTO_LIBRARY_SETUP.md` for
 stored references and version 3 processing settings. Deploy the new source and
 set both login variables together; leaving both unset retains legacy key access.

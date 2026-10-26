@@ -53,13 +53,24 @@ class WebsiteLoginTests(unittest.TestCase):
             self.assertIn(flag, response.headers["set-cookie"])
         page = self.client.get("/")
         self.assertEqual(page.status_code, 200)
-        self.assertIn('id="personalAccessField" hidden', page.text)
-        self.assertIn(SESSION_MARKER, page.text)
+        self.assertIn('id="personalAccessField"', page.text)
+        self.assertNotIn('id="personalAccessField" hidden', page.text)
+        self.assertNotIn(SESSION_MARKER, page.text)
         self.assertIn("Signed in as test-studio", page.text)
         self.assertNotIn(TEST_HASH, page.text)
         self.assertNotIn(TEST_PASSWORD, page.text)
         self.assertEqual(self.client.get("/api/references", headers=WEB).status_code, 200)
         self.assertEqual(self.client.get("/api/client-config?version=3", headers=WEB).status_code, 200)
+
+    def test_personal_key_selects_profile_while_website_signed_in(self):
+        self.login()
+        headers = {**ORIGIN, "Authorization": "Bearer test-extension-access-key-123456789012345"}
+        config = self.client.get("/api/client-config?version=3", headers=headers)
+        self.assertEqual(config.status_code, 200)
+        self.assertEqual(config.json()["userId"], "extension")
+        self.assertEqual(self.client.get("/api/references", headers=headers).status_code, 200)
+        invalid = {**ORIGIN, "Authorization": "Bearer invalid-personal-key-12345678901234567890"}
+        self.assertEqual(self.client.get("/api/client-config?version=3", headers=invalid).status_code, 401)
 
     def test_marker_alone_is_not_a_credential_and_admin_is_separate(self):
         self.assertEqual(self.client.get("/api/references", headers=WEB).status_code, 401)
